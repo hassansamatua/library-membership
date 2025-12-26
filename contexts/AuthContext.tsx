@@ -98,12 +98,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         cache: 'no-store'
       });
 
+      // First, handle non-OK responses
+      if (!response.ok) {
+        let errorMessage = 'Login failed';
+        try {
+          // Try to parse the error response
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          // If we can't parse the error, use the status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        
+        // Special handling for unapproved users
+        if (response.status === 403) {
+          errorMessage = 'Your account is pending approval. Please contact the administrator.';
+        }
+        
+        throw new Error(errorMessage);
+      }
+      
+      // If we get here, the response is OK
       const data = await response.json();
+
       console.log('[AuthContext] Login response status:', response.status);
       
-      if (!response.ok) {
-        console.error('[AuthContext] Login failed:', data.message || 'No error message');
-        throw new Error(data.message || 'Login failed');
+      if (!data.user) {
+        console.error('[AuthContext] No user data in response');
+        throw new Error('No user data received');
       }
 
       if (!data.user) {

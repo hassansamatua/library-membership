@@ -36,6 +36,17 @@ export async function POST(req: Request) {
       );
     }
 
+    // Check if user is approved
+    if (!user.is_approved) {
+      console.log('User not approved:', user.email);
+      return new NextResponse(
+        JSON.stringify({ 
+          message: 'Your account is pending approval. Please contact the administrator.' 
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Generate JWT token
     const token = generateToken(user);
     console.log('Generated token:', token ? 'Token generated successfully' : 'Failed to generate token');
