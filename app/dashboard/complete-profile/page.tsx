@@ -204,23 +204,37 @@ export default function CompleteProfilePage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    try {
-      // Here you would typically send the form data to your backend
-      await updateProfile(formData);
-      
-      toast.success('Profile updated successfully!');
-      router.push('/dashboard');
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error('Failed to update profile. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  e.preventDefault();
+  try {
+    const token = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('auth-token='))
+      ?.split('=')[1];
 
+    console.log('Token from cookie (first 20 chars):', token ? `${token.substring(0, 20)}...` : 'No token found');
+    
+    const response = await fetch('/api/auth/profile', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include', // Important for cookies
+      body: JSON.stringify(formData)
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update profile');
+    }
+
+    const result = await response.json();
+    toast.success('Profile updated successfully');
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    toast.error('Failed to update profile. Please try again.');
+  }
+};
   const renderSection = () => {
     switch (activeSection) {
       case 'personal':

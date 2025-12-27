@@ -123,27 +123,31 @@ const handleApproveUser = async (userId: number) => {
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newUser),
-      });
+  e.preventDefault();
+  try {
+    const response = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(newUser),
+    });
 
-      if (!res.ok) throw new Error('Failed to create user');
-
-      setNewUser({ name: '', email: '', isAdmin: false });
-      setShowCreateModal(false);
-      await fetchUsers();
-      toast.success('User created successfully');
-    } catch (error) {
-      console.error('Error creating user:', error);
-      toast.error('Failed to create user');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create user');
     }
-  };
+
+    const data = await response.json();
+    toast.success('User created successfully');
+    setShowCreateModal(false);
+    setNewUser({ name: '', email: '', isAdmin: false });
+    fetchUsers(); // Refresh the users list
+  } catch (error) {
+    console.error('Error creating user:', error);
+    toast.error(error instanceof Error ? error.message : 'Failed to create user');
+  }
+};
 
   const handleGenerateIdCard = (userId: number) => {
     // Implementation for generating ID card

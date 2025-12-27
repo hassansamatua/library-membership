@@ -12,15 +12,22 @@ export function Navbar() {
         <nav className="w-full py-5 flex items-center justify-between border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="container mx-auto px-4 flex items-center justify-between">
                 <div className="flex items-center gap-8">
-                    <Link href="/" className="flex items-center gap-2">
-                        <Image 
-                            src="/logo.jpeg" 
-                            alt="HanscoDev Logo" 
-                            width={140} 
-                            height={40} 
-                            priority
-                            className="dark:invert dark:brightness-90"
-                        />
+                  <Link href="/" className="flex items-center gap-2">
+                        <div className="relative w-[140px] h-[40px]">
+                            <Image
+                                src="/logo.png"
+                                alt="TLA Logo"
+                                fill
+                                priority
+                                unoptimized  // Add this line
+                                className="object-contain dark:invert dark:brightness-90"
+                                onError={(e) => {
+                                    console.error('Failed to load logo');
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                }}
+                            />
+                        </div>
                     </Link>
                     <div className="hidden md:flex items-center gap-1">
                         <Link className={buttonVariants({variant:'ghost'})} href='/'>
