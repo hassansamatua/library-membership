@@ -13,7 +13,22 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 export function ThemeToggle() {
-  const { setTheme } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+  const { theme, setTheme } = useTheme()
+
+  // Only render the theme toggle on the client after mounting
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    // Return a placeholder with the same dimensions to prevent layout shift
+    return (
+      <Button variant="outline" size="icon" aria-label="Loading theme">
+        <div className="h-[1.2rem] w-[1.2rem]" />
+      </Button>
+    )
+  }
 
   return (
     <DropdownMenu>

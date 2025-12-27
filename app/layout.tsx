@@ -28,29 +28,32 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+    <html lang="en" suppressHydrationWarning className="h-full">
+      <body suppressHydrationWarning
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background text-foreground`}
       >
-
-  
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <main className="max-w-7xl mx-auto w-full">
-              <AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <div className="min-h-screen flex flex-col">
+              <main className="max-w-7xl mx-auto w-full">
                 {children}
-                <ToastContainer position="bottom-right" />
-              </AuthProvider>
-            </main>
-          </ThemeProvider>
-  
-       
+              </main>
+            </div>
+            <ToastContainer 
+              position="bottom-right"
+              theme="colored"
+              className="[&>div]:bg-background! [&>div]:text-foreground! [&>div]:border! [&>div]:border-border!"
+              toastClassName="bg-background! text-foreground! border! border-border!"
+              progressClassName="bg-primary!"
+            />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
-      
     </html>
   );
 }
