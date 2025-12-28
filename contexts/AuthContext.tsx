@@ -69,8 +69,8 @@ interface AuthContextType {
   user: (User & { profile?: Partial<UserProfile> }) | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<User>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ user: User | null; requiresApproval?: boolean; message?: string }>;
+  register: (name: string, email: string, password: string, nida: string, membershipType: 'personal' | 'organization', phoneNumber: string, organizationName: string | null) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (profileData: Partial<UserProfile>) => Promise<void>;
 }
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  const login = async (email: string, password: string): Promise<User> => {
+  const login = async (email: string, password: string) => {
     console.log('[AuthContext] Starting login for email:', email);
     try {
       console.log('[AuthContext] Sending login request to /api/auth/login');
@@ -98,36 +98,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         cache: 'no-store'
       });
 
-      // First, handle non-OK responses
+      const data = await response.json();
+      
       if (!response.ok) {
-        let errorMessage = 'Login failed';
-        try {
-          // Try to parse the error response
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          // If we can't parse the error, use the status text
-          errorMessage = response.statusText || errorMessage;
-        }
-        
-        // Special handling for unapproved users
         if (response.status === 403) {
-          errorMessage = 'Your account is pending approval. Please contact the administrator.';
+          // Redirect to pending approval page
+          router.push('/auth/pending-approval');
+          return { user: null, requiresApproval: true, message: data.message };
         }
-        
-        throw new Error(errorMessage);
+        throw new Error(data.message || 'Login failed');
       }
       
       // If we get here, the response is OK
-      const data = await response.json();
-
-      console.log('[AuthContext] Login response status:', response.status);
-      
-      if (!data.user) {
-        console.error('[AuthContext] No user data in response');
-        throw new Error('No user data received');
-      }
-
       if (!data.user) {
         console.error('[AuthContext] No user data in response');
         throw new Error('No user data received');
@@ -153,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       
       // Return the normalized user data
-      return userData;
+      return { user: userData };
     } catch (error) {
       console.error('Login error:', error);
       setUser(null);
@@ -200,19 +182,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password }),
-    });
+  const register = async (name: string, email: string, password: string, nida: string, membershipType: 'personal' | 'organization', phoneNumber: string, organizationName: string | null) => {
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name, 
+          email, 
+          password, 
+          nida, 
+          membershipType, 
+          phoneNumber, 
+          organizationName 
+        }),
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Registration failed');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Registration failed');
+      }
+
+      // After successful registration, log the user in
+      await login(email, password);
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
     }
-
-    router.push('/auth/login?registered=true');
   };
 
   // Check if user is logged in on initial load

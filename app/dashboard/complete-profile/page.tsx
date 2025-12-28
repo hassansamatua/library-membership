@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'react-toastify';
+import { useEffect } from 'react';
 import 'react-toastify/dist/ReactToastify.css';
 import { FiUser, FiMail, FiPhone, FiCalendar, FiMapPin, FiBriefcase, FiBook, FiAward, FiCreditCard, FiFileText } from 'react-icons/fi';
 
@@ -71,10 +72,10 @@ type ProfileData = {
 export default function CompleteProfilePage() {
   const { user, updateProfile } = useAuth();
   const router = useRouter();
-  
   const [activeSection, setActiveSection] = useState('personal');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [educationCount, setEducationCount] = useState(1);
+  const [formattedMembershipNumber, setFormattedMembershipNumber] = useState('MEM2500001');
   
   const [formData, setFormData] = useState<ProfileData>({
     personalInfo: {
@@ -82,11 +83,12 @@ export default function CompleteProfilePage() {
       gender: '',
       dateOfBirth: '',
       placeOfBirth: '',
+      idNumber: '',
       profilePicture: null,
       nationality: 'Tanzanian',
-      idNumber: ''
     },
     contactInfo: {
+      socialMedia: {},
       email: user?.email || '',
       phone: '',
       address: '',
@@ -104,16 +106,20 @@ export default function CompleteProfilePage() {
     education: [{
       highestQualification: '',
       institution: '',
-      yearOfGraduation: ''
+      yearOfGraduation: '',
+      additionalCertifications: ''
     }],
     membership: {
       membershipType: 'regular',
       membershipNumber: `MEM-${Date.now().toString().slice(-6)}`,
       membershipStatus: 'pending',
-      joinDate: new Date().toISOString().split('T')[0]
+      joinDate: new Date().toISOString().split('T')[0],
+      areasOfInterest: ''
     },
     payment: {
       paymentMethod: 'mobile_money',
+      accountNumber: '',
+      bankName: '',
       cardNumber: '',
       expiryDate: '',
       cvv: ''
@@ -130,6 +136,28 @@ export default function CompleteProfilePage() {
     }
   });
 
+  // Call formatMembershipNumber when the component mounts or when the membership number changes
+  useEffect(() => {
+  const loadMembershipNumber = async () => {
+    try {
+      const response = await fetch('/api/membership/next-number');
+      const data = await response.json();
+      if (data.success) {
+        setFormData(prev => ({
+          ...prev,
+          membership: {
+            ...prev.membership,
+            membershipNumber: data.membershipNumber
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading membership number:', error);
+    }
+  };
+  
+  loadMembershipNumber();
+}, []);
   const handleAddEducation = () => {
     if (educationCount < 3) { // Limit to 3 education entries
       setFormData(prev => ({
@@ -202,6 +230,28 @@ export default function CompleteProfilePage() {
       }
     }));
   };
+
+ const formatMembershipNumber = async (number: string): Promise<string> => {
+  if (!number) {
+    try {
+      const response = await fetch('/api/membership/next-number');
+      const data = await response.json();
+      if (data.success) {
+        return data.membershipNumber;
+      }
+      console.error('Failed to generate membership number:', data.error);
+      return 'MEM2500001'; // Fallback
+    } catch (error) {
+      console.error('Error generating membership number:', error);
+      return 'MEM2500001'; // Fallback
+    }
+  }
+  
+  // Format existing number
+  const cleanNumber = number.replace(/[^0-9]/g, '').slice(-5);
+  const year = new Date().getFullYear().toString().slice(-2);
+  return `MEM${year}${cleanNumber.padStart(5, '0')}`;
+};
 
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -788,105 +838,114 @@ export default function CompleteProfilePage() {
         <div className="space-y-6">
           <div>
             <h3 className="text-lg font-medium leading-6 text-gray-900">Membership Details</h3>
-            <p className="mt-1 text-sm text-gray-600">Your membership information and preferences.</p>
+            <p className="mt-1 text-sm text-gray-600">Your membership information and status.</p>
           </div>
-          <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-            {/* Membership Type */}
-            <div className="sm:col-span-3">
-              <label htmlFor="membershipType" className="block text-sm font-medium text-gray-700">
-                Membership Type
-              </label>
-              <div className="mt-1">
-                <select
-                  id="membershipType"
-                  name="membershipType"
-                  className="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  value={formData.membership.membershipType}
-                  onChange={(e) => handleInputChange('membership', 'membershipType', e.target.value)}
-                >
-                  <option value="individual">Individual</option>
-                  <option value="student">Student</option>
-                  <option value="corporate">Corporate</option>
-                  <option value="lifetime">Lifetime</option>
-                </select>
+
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                {/* Membership Type */}
+                <div className="sm:col-span-3">
+                  <label className="block text-sm font-medium text-gray-700">Membership Type</label>
+                  <div className="mt-1">
+                    <div className="relative rounded-md shadow-sm">
+                      <input
+                        type="text"
+                        className="bg-gray-50 border border-gray-300 text-gray-700 block w-full sm:text-sm rounded-md p-2"
+                        value={formData.membership.membershipType || 'Standard'}
+                        readOnly
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Membership Number */}
+                <div className="sm:col-span-3">
+                  <label className="block text-sm font-medium text-gray-700">Membership Number</label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="flex">
+                      <input
+                        type="text"
+                        className="bg-gray-50 border border-gray-300 text-gray-700 block w-full sm:text-sm rounded-l-md p-2"
+                        value={formattedMembershipNumber}
+                        readOnly
+                      />
+                      {formattedMembershipNumber && formattedMembershipNumber !== 'MEM2500001' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(formattedMembershipNumber);
+                            toast.success('Membership number copied to clipboard');
+                          }}
+                          className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 hover:bg-gray-100"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Membership Status */}
+                <div className="sm:col-span-3">
+                  <label className="block text-sm font-medium text-gray-700">Membership Status</label>
+                  <div className="mt-1">
+                    <div className="relative rounded-md shadow-sm">
+                      <input
+                        type="text"
+                        className="bg-gray-50 border border-gray-300 text-gray-700 block w-full sm:text-sm rounded-md p-2"
+                        value={formData.membership.membershipStatus || 'Pending Approval'}
+                        readOnly
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Join Date */}
+                <div className="sm:col-span-3">
+                  <label className="block text-sm font-medium text-gray-700">Join Date</label>
+                  <div className="mt-1">
+                    <div className="relative rounded-md shadow-sm">
+                      <input
+                        type="text"
+                        className="bg-gray-50 border border-gray-300 text-gray-700 block w-full sm:text-sm rounded-md p-2"
+                        value={formData.membership.joinDate ? new Date(formData.membership.joinDate).toLocaleDateString() : 'N/A'}
+                        readOnly
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Areas of Interest */}
+                <div className="sm:col-span-6">
+                  <label className="block text-sm font-medium text-gray-700">Areas of Interest</label>
+                  <div className="mt-1">
+                    <div className="relative rounded-md shadow-sm">
+                      <div className="bg-gray-50 border border-gray-300 rounded-md p-3 min-h-12">
+                        {formData.participation.areasOfInterest && formData.participation.areasOfInterest.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {Array.isArray(formData.participation.areasOfInterest) ? (
+                              formData.participation.areasOfInterest.map((interest, index) => (
+                                <span key={index} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {interest}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {formData.participation.areasOfInterest}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500">No areas of interest selected</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-            {/* Membership Number */}
-            <div className="sm:col-span-3">
-              <label htmlFor="membershipNumber" className="block text-sm font-medium text-gray-700">
-                Membership Number
-              </label>
-              <div className="mt-1">
-                <input
-                  type="text"
-                  id="membershipNumber"
-                  name="membershipNumber"
-                  className="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  value={formData.membership.membershipNumber}
-                  onChange={(e) => handleInputChange('membership', 'membershipNumber', e.target.value)}
-                />
-              </div>
-            </div>
-            {/* Membership Status */}
-            <div className="sm:col-span-3">
-              <label htmlFor="membershipStatus" className="block text-sm font-medium text-gray-700">
-                Membership Status
-              </label>
-              <div className="mt-1">
-                <select
-                  id="membershipStatus"
-                  name="membershipStatus"
-                  className="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  value={formData.membership.membershipStatus}
-                  onChange={(e) => handleInputChange('membership', 'membershipStatus', e.target.value)}
-                >
-                  <option value="active">Active</option>
-                  <option value="pending">Pending</option>
-                  <option value="expired">Expired</option>
-                </select>
-              </div>
-            </div>
-            {/* Join Date */}
-            <div className="sm:col-span-3">
-              <label htmlFor="joinDate" className="block text-sm font-medium text-gray-700">
-                Join Date
-              </label>
-              <div className="mt-1">
-                <input
-                  type="date"
-                  id="joinDate"
-                  name="joinDate"
-                  className="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  value={formData.membership.joinDate}
-                  onChange={(e) => handleInputChange('membership', 'joinDate', e.target.value)}
-                />
-              </div>
-            </div>
-            {/* Areas of Interest */}
-            <div className="sm:col-span-6">
-              <label htmlFor="areasOfInterest" className="block text-sm font-medium text-gray-700">
-                Areas of Interest
-              </label>
-              <div className="mt-1">
-                <select
-                  multiple
-                  id="areasOfInterest"
-                  name="areasOfInterest"
-                  className="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  value={formData.membership.areasOfInterest}
-                  onChange={(e) => {
-                    const selected = Array.from(e.target.selectedOptions, option => option.value);
-                    handleInputChange('membership', 'areasOfInterest', selected);
-                  }}
-                >
-                  <option value="networking">Networking</option>
-                  <option value="professional_development">Professional Development</option>
-                  <option value="mentorship">Mentorship</option>
-                  <option value="leadership">Leadership</option>
-                  <option value="community_service">Community Service</option>
-                </select>
-              </div>
-              <p className="mt-1 text-xs text-gray-500">Hold Ctrl/Cmd to select multiple options</p>
             </div>
           </div>
         </div>
@@ -1196,7 +1255,7 @@ export default function CompleteProfilePage() {
     default:
       return null;
   }
-  };
+};
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

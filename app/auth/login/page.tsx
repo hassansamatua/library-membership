@@ -27,7 +27,19 @@ export default function LoginPage() {
 
     try {
       console.log('[Login] Calling login function...');
-      const userData = await login(email, password);
+      const result = await login(email, password);
+      
+      if (result.requiresApproval) {
+        console.log('[Login] User requires approval, redirecting to pending page');
+        router.push('/auth/pending-approval');
+        return;
+      }
+
+      const userData = result.user;
+      if (!userData) {
+        throw new Error('No user data received');
+      }
+
       console.log('[Login] Login successful, user data:', {
         id: userData.id,
         email: userData.email,

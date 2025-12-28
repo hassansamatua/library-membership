@@ -9,8 +9,12 @@ export async function middleware(request: NextRequest) {
 
   console.log(`[Middleware] Path: ${pathname}, Has Token: ${!!token}`);
 
-  // Allow auth and API routes
-  if (pathname.startsWith('/auth') || pathname.startsWith('/api')) {
+  // Allow auth routes (except protected ones) and API routes
+  if (pathname.startsWith('/api') || 
+      pathname === '/auth/login' || 
+      pathname === '/auth/register' ||
+      pathname === '/auth/forgot-password' ||
+      pathname === '/auth/pending-approval') {
     console.log(`[Middleware] Allowing access to: ${pathname}`);
     return NextResponse.next();
   }
@@ -52,6 +56,12 @@ export async function middleware(request: NextRequest) {
       isAdmin: userData.isAdmin || userData.is_admin,
       isApproved: userData.is_approved
     }));
+    
+    // Check if user is approved
+    if (userData.is_approved === false && !pathname.startsWith('/auth/pending-approval')) {
+      console.log('[Middleware] User not approved, redirecting to pending approval page');
+      return NextResponse.redirect(new URL('/auth/pending-approval', request.url));
+    }
     
     // If trying to access admin routes without admin privileges
     if (pathname.startsWith('/admin')) {

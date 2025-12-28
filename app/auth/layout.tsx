@@ -11,7 +11,7 @@ export default function AuthLayout({children}: {children: React.ReactNode}){
                 <ArrowLeft className="size-4"/>Back
             </Link>
             </div>
-        <div className="w-full max-w-md mx-auto">
+        <div className="w-full max-w-5xl mx-auto">
             {children}
             </div>
         </div>
