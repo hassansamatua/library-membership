@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { FiUser, FiCalendar, FiMail, FiPhone, FiMapPin, FiBriefcase, FiCheckCircle, FiAlertCircle, FiArrowRight } from "react-icons/fi";
+import { FiUser, FiCalendar, FiMail, FiPhone, FiMapPin, FiBriefcase, FiCheckCircle, FiAlertCircle, FiArrowRight, FiCreditCard } from "react-icons/fi";
 
 const calculateProfileCompletion = (user: any) => {
   if (!user) return 0;
@@ -55,6 +55,12 @@ export default function DashboardPage() {
   }
 
   const quickActions = [
+    { 
+      title: 'Membership Card',
+      description: 'View and print your membership card',
+      icon: <FiCreditCard className="h-6 w-6 text-purple-600" />,
+      action: () => router.push('/dashboard/membership-card')
+    },
     { 
       title: 'View Profile', 
       description: 'View and edit your profile information',
