@@ -1,101 +1,38 @@
 // middleware.ts
 import { NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 
-// In middleware.ts
 export async function middleware(request: NextRequest) {
-  const token = request.cookies.get('token')?.value;
-  const { pathname } = request.nextUrl;
+  const token = await getToken({ 
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
 
-  console.log(`[Middleware] Path: ${pathname}, Has Token: ${!!token}`);
-
-  // Allow auth routes (except protected ones) and API routes
-  if (pathname.startsWith('/api') || 
-      pathname === '/auth/login' || 
-      pathname === '/auth/register' ||
-      pathname === '/auth/forgot-password' ||
-      pathname === '/auth/pending-approval') {
-    console.log(`[Middleware] Allowing access to: ${pathname}`);
-    return NextResponse.next();
-  }
-
-  // If no token, redirect to login
-  if (!token) {
-    console.log('[Middleware] No token found, redirecting to login');
-    const loginUrl = new URL('/auth/login', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  try {
-    console.log('[Middleware] Verifying token...');
-    // Verify token by making a request to the /api/auth/me endpoint
-    const meUrl = new URL('/api/auth/me', request.url);
-    console.log(`[Middleware] Calling ${meUrl.toString()}`);
-    
-    const response = await fetch(meUrl, {
-      headers: {
-        Cookie: `token=${token}`,
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      },
-      cache: 'no-store'
-    });
-
-    console.log(`[Middleware] Auth check status: ${response.status}`);
-
-    if (!response.ok) {
-      console.log(`[Middleware] Auth check failed with status: ${response.status}`);
-      throw new Error('Invalid token');
+  // For API routes
+  if (request.nextUrl.pathname.startsWith('/api/auth/profile')) {
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
-    const userData = await response.json();
-    console.log(`[Middleware] User data:`, JSON.stringify({
-      id: userData.id,
-      email: userData.email,
-      isAdmin: userData.isAdmin || userData.is_admin,
-      isApproved: userData.is_approved
-    }));
-    
-    // Check if user is approved
-    if (userData.is_approved === false && !pathname.startsWith('/auth/pending-approval')) {
-      console.log('[Middleware] User not approved, redirecting to pending approval page');
-      return NextResponse.redirect(new URL('/auth/pending-approval', request.url));
-    }
-    
-    // If trying to access admin routes without admin privileges
-    if (pathname.startsWith('/admin')) {
-      const isAdmin = Boolean(userData.isAdmin || userData.is_admin);
-      console.log(`[Middleware] Admin route access - isAdmin: ${isAdmin}`);
-      
-      if (!isAdmin) {
-        console.log('[Middleware] Non-admin user trying to access admin route, redirecting to /dashboard');
-        return NextResponse.redirect(new URL('/dashboard', request.url));
-      }
-    }
-
-    // Clone the request headers and add user info
+    // Clone the request headers and add the user ID
     const requestHeaders = new Headers(request.headers);
-    requestHeaders.set('x-user-id', userData.id);
-    requestHeaders.set('x-user-role', (userData.isAdmin || userData.is_admin) ? 'admin' : 'user');
+    requestHeaders.set('x-user-id', token.id as string);
 
-    console.log('[Middleware] Authentication successful, proceeding to route');
+    // Return a new response with the new headers
     return NextResponse.next({
       request: {
         headers: requestHeaders,
       },
     });
-  } catch (error) {
-    console.error('Auth error:', error);
-    // Clear invalid token and redirect to login
-    const response = NextResponse.redirect(new URL('/auth/login', request.url));
-    response.cookies.delete('token');
-    return response;
   }
+
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/auth/).*)',
-  ],
+  matcher: ['/dashboard/:path*', '/api/auth/:path*'],
 };

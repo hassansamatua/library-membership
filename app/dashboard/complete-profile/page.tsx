@@ -76,6 +76,7 @@ export default function CompleteProfilePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [educationCount, setEducationCount] = useState(1);
   const [formattedMembershipNumber, setFormattedMembershipNumber] = useState('MEM2500001');
+  const [error, setError] = useState('');
   
   const [formData, setFormData] = useState<ProfileData>({
     personalInfo: {
@@ -253,38 +254,56 @@ export default function CompleteProfilePage() {
   return `MEM${year}${cleanNumber.padStart(5, '0')}`;
 };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+ const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
-  try {
-    const token = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('auth-token='))
-      ?.split('=')[1];
+  setIsSubmitting(true);
+  setError('');
 
-    console.log('Token from cookie (first 20 chars):', token ? `${token.substring(0, 20)}...` : 'No token found');
+  try {
+    if (!user?.id) {
+      throw new Error('You must be logged in to update your profile');
+    }
+
+    console.log('Submitting profile data:', JSON.stringify(formData, null, 2));
     
     const response = await fetch('/api/auth/profile', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
-      credentials: 'include', // Important for cookies
+      credentials: 'include',
       body: JSON.stringify(formData)
     });
 
+    const responseData = await response.json();
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to update profile');
+      console.error('API Error Response:', responseData);
+      throw new Error(
+        responseData.error || 
+        responseData.message || 
+        `Failed to update profile (Status: ${response.status})`
+      );
     }
 
-    const result = await response.json();
-    toast.success('Profile updated successfully');
-  } catch (error) {
+    console.log('Profile update successful:', responseData);
+    toast.success('Profile updated successfully!');
+    
+    // Update the user context if needed
+    if (updateProfile) {
+      updateProfile({ ...user, ...formData });
+    }
+    
+  } catch (error: unknown) {
     console.error('Error updating profile:', error);
-    toast.error('Failed to update profile. Please try again.');
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update profile';
+    setError(errorMessage);
+    toast.error(errorMessage);
+  } finally {
+    setIsSubmitting(false);
   }
 };
+
   const renderSection = () => {
     switch (activeSection) {
       case 'personal':
