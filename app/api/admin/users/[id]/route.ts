@@ -1,22 +1,41 @@
 // app/api/admin/users/[id]/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
-import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { verifyToken } from '@/lib/auth';
+import { ResultSetHeader, RowDataPacket, PoolConnection } from 'mysql2/promise';
 
 export async function DELETE(
-  request: Request,
-  context: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
-  let connection;
+  let connection: PoolConnection | null = null;
+  
   try {
-    // Get the ID from the context params
-    const { id } = await Promise.resolve(context.params);
+    const { id } = params;
     const userId = parseInt(id, 10);
     
-    if (isNaN(userId)) {
+    if (isNaN(userId) || userId <= 0) {
       return NextResponse.json(
-        { success: false, message: 'Invalid user ID' },
+        { error: 'Invalid user ID format' },
         { status: 400 }
+      );
+    }
+
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.split(' ')[1];
+    
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const decoded = verifyToken(token);
+    if (!decoded || !(decoded as any).isAdmin) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Admin access required' },
+        { status: 403 }
       );
     }
 
@@ -24,7 +43,6 @@ export async function DELETE(
     await connection.beginTransaction();
 
     try {
-      // 1. Get the user data before deletion
       const [users] = await connection.query<RowDataPacket[]>(
         'SELECT * FROM users WHERE id = ?',
         [userId]
@@ -33,14 +51,13 @@ export async function DELETE(
       if (users.length === 0) {
         await connection.rollback();
         return NextResponse.json(
-          { success: false, message: 'User not found' },
+          { error: 'User not found' },
           { status: 404 }
         );
       }
 
       const user = users[0];
       
-      // 2. Insert into deleted_users table
       await connection.query(
         `INSERT INTO deleted_users 
          (user_id, name, email, deleted_by, original_data)
@@ -49,13 +66,11 @@ export async function DELETE(
           user.id,
           user.name,
           user.email,
-          // Get the admin ID from the request headers or session
           request.headers.get('x-user-id') || null,
-          JSON.stringify(user) // Store the complete user data
+          JSON.stringify(user)
         ]
       );
 
-      // 3. Delete from users table
       const [result] = await connection.query<ResultSetHeader>(
         'DELETE FROM users WHERE id = ?',
         [userId]

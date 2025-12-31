@@ -70,7 +70,16 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ user: User | null; requiresApproval?: boolean; message?: string }>;
-  register: (name: string, email: string, password: string, nida: string, membershipType: 'personal' | 'organization', phoneNumber: string, organizationName: string | null) => Promise<void>;
+  register: (userData: {
+    name: string;
+    email: string;
+    password: string;
+    nida: string;
+    membershipType: 'personal' | 'organization';
+    phoneNumber: string;
+    organizationName?: string;
+    [key: string]: any; // Allow additional fields
+  }) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (profileData: Partial<UserProfile>) => Promise<void>;
 }
@@ -182,8 +191,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (name: string, email: string, password: string, nida: string, membershipType: 'personal' | 'organization', phoneNumber: string, organizationName: string | null) => {
+  const register = async (userData: {
+    name: string;
+    email: string;
+    password: string;
+    nida: string;
+    membershipType: 'personal' | 'organization';
+    phoneNumber: string;
+    organizationName?: string;
+    [key: string]: any;
+  }) => {
     try {
+      const { name, email, password, nida, membershipType, phoneNumber, organizationName, ...rest } = userData;
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -194,7 +213,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           nida, 
           membershipType, 
           phoneNumber, 
-          organizationName 
+          organizationName, 
+          ...rest 
         }),
       });
 

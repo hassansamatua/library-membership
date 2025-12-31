@@ -4,7 +4,12 @@ import type { NextRequest } from 'next/server';
 
 // In middleware.ts
 export async function middleware(request: NextRequest) {
-  const token = request.cookies.get('token')?.value;
+  // Check for token in both Authorization header and cookies
+  const authHeader = request.headers.get('authorization');
+  const token = authHeader?.startsWith('Bearer ') 
+    ? authHeader.split(' ')[1] 
+    : request.cookies.get('token')?.value;
+  
   const { pathname } = request.nextUrl;
 
   console.log(`[Middleware] Path: ${pathname}, Has Token: ${!!token}`);
@@ -35,10 +40,12 @@ export async function middleware(request: NextRequest) {
     
     const response = await fetch(meUrl, {
       headers: {
-        Cookie: `token=${token}`,
+        'Authorization': `Bearer ${token}`,
+        'Cookie': `token=${token}`,
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
       },
+      credentials: 'include',
       cache: 'no-store'
     });
 

@@ -10,48 +10,54 @@ export default function MembershipPage() {
 
   const membershipPlans = [
     {
-      name: 'Basic',
-      price: '49',
-      period: '/year',
-      description: 'Perfect for individuals getting started',
-      features: [
-        'Access to basic resources',
-        'Community forum access',
-        'Email support',
-        'Basic analytics'
-      ],
-      buttonText: 'Get Started',
-      popular: false
-    },
-    {
-      name: 'Professional',
-      price: '99',
-      period: '/year',
-      description: 'For professionals who need more',
-      features: [
-        'Everything in Basic',
-        'Advanced analytics',
-        'Priority support',
-        'Exclusive webinars',
-        'Early access to new features'
-      ],
-      buttonText: 'Upgrade Now',
-      popular: true
-    },
-    {
-      name: 'Enterprise',
-      price: 'Custom',
+      name: 'Personal (New User)',
+      price: '40,000',
       period: '',
-      description: 'For organizations with custom needs',
+      description: 'For new individual members',
       features: [
-        'Everything in Professional',
-        'Dedicated account manager',
-        'Custom integrations',
-        'SLA 99.9% uptime',
-        'Training & onboarding'
+        'Full library access',
+        'Community events',
+        'Email support',
+        'Basic member benefits'
       ],
-      buttonText: 'Contact Sales',
-      popular: false
+      buttonText: 'Join Now',
+      popular: false,
+      type: 'personal',
+      isNewUser: true
+    },
+    {
+      name: 'Personal (Renewal)',
+      price: '30,000',
+      period: '',
+      description: 'For existing members renewing',
+      features: [
+        'Full library access',
+        'Community events',
+        'Email support',
+        'Renewal discount',
+        'Member loyalty benefits'
+      ],
+      buttonText: 'Renew Membership',
+      popular: true,
+      type: 'personal',
+      isNewUser: false
+    },
+    {
+      name: 'Organization',
+      price: '150,000',
+      period: '',
+      description: 'For companies and organizations',
+      features: [
+        'All personal member benefits',
+        'Up to 5 member accounts',
+        'Priority support',
+        'Organization profile',
+        'Training & onboarding',
+        'Dedicated account manager'
+      ],
+      buttonText: 'Register Organization',
+      popular: false,
+      type: 'organization'
     }
   ];
 
@@ -86,7 +92,7 @@ export default function MembershipPage() {
                 <h3 className="text-lg font-medium text-gray-900">{plan.name}</h3>
                 <div className="mt-4 flex items-baseline">
                   <span className="text-4xl font-extrabold text-gray-900">
-                    ${plan.price}
+                    Tsh. {plan.price}
                   </span>
                   <span className="ml-1 text-xl font-medium text-gray-500">
                     {plan.period}
@@ -105,7 +111,11 @@ export default function MembershipPage() {
                 
                 <div className="mt-8">
                   <Link
-                    href={plan.name === 'Enterprise' ? '/contact' : isAuthenticated ? '/dashboard/subscribe' : '/auth/register'}
+                    href={isAuthenticated ? 
+                      (plan.type === 'personal' ? 
+                        `/dashboard/subscribe?type=personal&newUser=${plan.isNewUser}` : 
+                        '/dashboard/subscribe?type=organization') : 
+                      '/auth/register'}
                     className={`block w-full px-6 py-3 text-center rounded-md font-medium ${
                       plan.popular 
                         ? 'bg-green-600 text-white hover:bg-green-700' 

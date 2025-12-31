@@ -6,9 +6,16 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 
-export default function RegisterPage() {
-  type MembershipType = 'personal' | 'organization';
+// List of all Tanzanian regions
+const TANZANIA_REGIONS = [
+  "Arusha", "Dar es Salaam", "Dodoma", "Geita", "Iringa", "Kagera",
+  "Katavi", "Kigoma", "Kilimanjaro", "Lindi", "Manyara", "Mara", "Mbeya",
+  "Mjini Magharibi", "Morogoro", "Mtwara", "Mwanza", "Njombe", "Pemba North",
+  "Pemba South", "Pwani", "Rukwa", "Ruvuma", "Shinyanga", "Simiyu", "Singida",
+  "Songwe", "Tabora", "Tanga", "Unguja North", "Unguja South"
+];
 
+export default function RegisterPage() {
   type MembershipType = 'personal' | 'organization';
 
   const [formData, setFormData] = useState({
@@ -20,18 +27,46 @@ export default function RegisterPage() {
     membershipType: "personal" as MembershipType,
     phoneNumber: "",
     otherPhoneNumber: "",
-    organizationName: ""
+    organizationName: "",
+    // New fields
+    dateOfBirth: "",
+    gender: "",
+    country: "Tanzania",
+    region: "",
+    district: "",
+    ward: "",
+    street: "",
+    houseNumber: "",
+    postalAddress: "",
+    postalCode: "",
+    occupation: "",
+    employerName: "",
+    workAddress: "",
+    workPhone: "",
+    workEmail: "",
+    educationLevel: "",
+    institutionName: "",
+    yearOfCompletion: "",
+    skills: "",
+    membershipCategory: "regular", // regular, student, honorary, etc.
+    membershipNumber: "", // Auto-generated
+    membershipDate: new Date().toISOString().split('T')[0], // Automatically set to current date // Automatically set to current date
+    agreeToTerms: false,
+    agreeToDataProcessing: false
   });
+
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
   const router = useRouter();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target as HTMLInputElement;
+    const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : undefined;
+    
     setFormData(prev => ({
       ...prev,
-      [name]: value,
+      [name]: type === 'checkbox' ? checked : value,
       // Clear organization name when switching to personal membership
       ...(name === 'membershipType' && value === 'personal' ? { organizationName: '' } : {})
     }));
@@ -40,8 +75,8 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    
-    // Basic validation
+
+    // Validation
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -52,31 +87,24 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!formData.agreeToTerms || !formData.agreeToDataProcessing) {
+      setError("You must agree to the terms and conditions and data processing policy");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       // Prepare the data to send to the API
       const userData = {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        nida: formData.nida,
-        membershipType: formData.membershipType,
-        phoneNumber: formData.phoneNumber,
-        organizationName: formData.membershipType === 'organization' ? formData.organizationName : null
+        ...formData,
+        // Remove confirmPassword and checkboxes from the data sent to the server
+        confirmPassword: undefined,
+        agreeToTerms: undefined,
+        agreeToDataProcessing: undefined
       };
 
-      // Call the register function with all necessary data
-      await register(
-        formData.name,
-        formData.email,
-        formData.password,
-        formData.nida,
-        formData.membershipType,
-        formData.phoneNumber,
-        formData.membershipType === 'organization' ? formData.organizationName : null
-      );
-      
+      await register(userData);
       router.push('/auth/login?registered=true');
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -85,13 +113,23 @@ export default function RegisterPage() {
     }
   };
 
+  // Helper function to render form sections
+  const renderSection = (title: string, children: React.ReactNode) => (
+    <div className="mb-8">
+      <h3 className="text-lg font-medium text-gray-900 mb-4">{title}</h3>
+      <div className="space-y-4">
+        {children}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-md w-full p-8 mx-auto mt-10">
-        <div className="text-center mb-10">
+      <div className="max-w-4xl w-full p-4 mx-auto my-8">
+        <div className="text-center mb-8">
           <h2 className="text-3xl font-extrabold text-gray-900">Create a new account</h2>
           <p className="mt-2 text-sm text-gray-600">
-            Join our community today
+            Please fill in all required fields marked with <span className="text-red-500">*</span>
           </p>
         </div>
 
@@ -101,199 +139,517 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <div className="bg-white p-8 shadow-lg rounded-lg">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Full name <span className="text-red-500">*</span>
-              </label>
-              <div className="mt-1">
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="First, Middle, Last"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email Address (Personal) <span className="text-red-500">*</span>
-              </label>
-              <div className="mt-1">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="Primary email for communication"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
-                Phone Number (Mobile) <span className="text-red-500">*</span>
-              </label>
-              <div className="mt-1">
-                <input
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  type="tel"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  value={formData.phoneNumber}
-                  onChange={handleChange}
-                  placeholder="Primary phone contact"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="otherPhoneNumber" className="block text-sm font-medium text-gray-700">
-                Other Phone Number (Work/Home)
-              </label>
-              <div className="mt-1">
-                <input
-                  id="otherPhoneNumber"
-                  name="otherPhoneNumber"
-                  type="tel"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  value={formData.otherPhoneNumber}
-                  onChange={handleChange}
-                  placeholder="Optional additional contacts"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="nida" className="block text-sm font-medium text-gray-700">
-                National ID (NIDA) Number <span className="text-red-500">*</span>
-              </label>
-              <div className="mt-1">
-                <input
-                  id="nida"
-                  name="nida"
-                  type="text"
-                  required
-                  minLength={16}
-                  maxLength={16}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  value={formData.nida}
-                  onChange={handleChange}
-                  placeholder="Enter your 16-digit NIDA number"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="membershipType" className="block text-sm font-medium text-gray-700">
-                Membership Type <span className="text-red-500">*</span>
-              </label>
-              <div className="mt-1">
-                <select
-                  id="membershipType"
-                  name="membershipType"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  value={formData.membershipType}
-                  onChange={handleChange}
-                >
-                  <option value="personal">Personal</option>
-                  <option value="organization">Organization</option>
-                </select>
-              </div>
-            </div>
-
-            {formData.membershipType === 'organization' && (
-              <div>
-                <label htmlFor="organizationName" className="block text-sm font-medium text-gray-700">
-                  Organization Name <span className="text-red-500">*</span>
-                </label>
-                <div className="mt-1">
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Personal Information Section */}
+          {renderSection("Personal Information",
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    id="organizationName"
-                    name="organizationName"
                     type="text"
+                    name="name"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    value={formData.organizationName}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.name}
                     onChange={handleChange}
-                    placeholder="Enter your organization name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Date of Birth <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="dateOfBirth"
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.dateOfBirth}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Gender <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="gender"
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.gender}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    National ID (NIDA) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="nida"
+                    required
+                    minLength={16}
+                    maxLength={16}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.nida}
+                    onChange={handleChange}
+                    placeholder="16-digit NIDA number"
                   />
                 </div>
               </div>
-            )}
+            </>
+          )}
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password <span className="text-red-500">*</span>
-              </label>
-              <div className="mt-1">
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  minLength={8}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  value={formData.password}
+          {/* Contact Information Section */}
+          {renderSection("Contact Information",
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.email}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Password <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    required
+                    minLength={8}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="At least 8 characters"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Confirm Password <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    required
+                    minLength={8}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    placeholder="Confirm your password"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    name="phoneNumber"
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.phoneNumber}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Other Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    name="otherPhoneNumber"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.otherPhoneNumber}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Country <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="country"
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.country}
+                    onChange={handleChange}
+                  >
+                    <option value="Tanzania">Tanzania</option>
+                    <option value="Kenya">Kenya</option>
+                    <option value="Uganda">Uganda</option>
+                    {/* Add more countries as needed */}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Region <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="region"
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.region}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select Region</option>
+                    {TANZANIA_REGIONS.map(region => (
+                      <option key={region} value={region}>
+                        {region}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    District <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="district"
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.district}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Ward
+                  </label>
+                  <input
+                    type="text"
+                    name="ward"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.ward}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Street
+                  </label>
+                  <input
+                    type="text"
+                    name="street"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.street}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    House Number
+                  </label>
+                  <input
+                    type="text"
+                    name="houseNumber"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.houseNumber}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Postal Address
+                  </label>
+                  <input
+                    type="text"
+                    name="postalAddress"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.postalAddress}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Postal Code
+                  </label>
+                  <input
+                    type="text"
+                    name="postalCode"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.postalCode}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Employment Information Section */}
+          {renderSection("Employment Information",
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Occupation/Profession
+                  </label>
+                  <input
+                    type="text"
+                    name="occupation"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.occupation}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Employer Name
+                  </label>
+                  <input
+                    type="text"
+                    name="employerName"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.employerName}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Work Address
+                  </label>
+                  <input
+                    type="text"
+                    name="workAddress"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.workAddress}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Work Phone
+                  </label>
+                  <input
+                    type="tel"
+                    name="workPhone"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.workPhone}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Work Email
+                  </label>
+                  <input
+                    type="email"
+                    name="workEmail"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.workEmail}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Education Background Section */}
+          {renderSection("Education Background",
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Highest Education Level
+                  </label>
+                  <select
+                    name="educationLevel"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.educationLevel}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select Education Level</option>
+                    <option value="primary">Primary Education</option>
+                    <option value="secondary">Secondary Education</option>
+                    <option value="diploma">Diploma</option>
+                    <option value="bachelor">Bachelor's Degree</option>
+                    <option value="master">Master's Degree</option>
+                    <option value="phd">PhD/Doctorate</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Institution Name
+                  </label>
+                  <input
+                    type="text"
+                    name="institutionName"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.institutionName}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Year of Completion
+                  </label>
+                  <input
+                    type="number"
+                    name="yearOfCompletion"
+                    min="1900"
+                    max={new Date().getFullYear()}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.yearOfCompletion}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Skills/Qualifications
+                </label>
+                <textarea
+                  name="skills"
+                  rows={3}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  value={formData.skills}
                   onChange={handleChange}
-                  placeholder="Create a strong password"
+                  placeholder="List your skills and qualifications, separated by commas"
                 />
+              </div>
+            </>
+          )}
+
+          {/* Membership Information Section */}
+          {renderSection("Membership Information",
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Membership Category <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="membershipCategory"
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.membershipCategory}
+                    onChange={handleChange}
+                  >
+                    <option value="personal">Personal</option>
+                    <option value="organization">Organization</option>
+                    
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Membership Number
+                  </label>
+                  <input
+                    type="text"
+                    name="membershipNumber"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-100"
+                    value={formData.membershipNumber || "Will be generated after approval"}
+                    readOnly
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Membership Date
+                </label>
+                <input
+                  type="text"
+                  name="membershipDate" readOnly
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  value={formData.membershipDate}
+                  onChange={handleChange}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Terms and Conditions */}
+          <div className="pt-4 border-t border-gray-200">
+            <div className="flex items-start">
+              <div className="flex items-center h-5">
+                <input
+                  id="agreeToTerms"
+                  name="agreeToTerms"
+                  type="checkbox"
+                  required
+                  className="focus:ring-green-500 h-4 w-4 text-green-600 border-gray-300 rounded"
+                  checked={formData.agreeToTerms}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="agreeToTerms" className="font-medium text-gray-700">
+                  I agree to the <a href="/terms" className="text-green-600 hover:text-green-500">Terms and Conditions</a> <span className="text-red-500">*</span>
+                </label>
               </div>
             </div>
 
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                Confirm Password <span className="text-red-500">*</span>
-              </label>
-              <div className="mt-1">
+            <div className="flex items-start mt-4">
+              <div className="flex items-center h-5">
                 <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
+                  id="agreeToDataProcessing"
+                  name="agreeToDataProcessing"
+                  type="checkbox"
                   required
-                  minLength={8}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  value={formData.confirmPassword}
+                  className="focus:ring-green-500 h-4 w-4 text-green-600 border-gray-300 rounded"
+                  checked={formData.agreeToDataProcessing}
                   onChange={handleChange}
-                  placeholder="Confirm your password"
                 />
               </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="agreeToDataProcessing" className="font-medium text-gray-700">
+                  I consent to the processing of my personal data in accordance with the <a href="/privacy" className="text-green-600 hover:text-green-500">Privacy Policy</a> <span className="text-red-500">*</span>
+                </label>
+              </div>
             </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-700 hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ${
-                  isLoading ? 'opacity-70 cursor-not-allowed' : ''
-                }`}
-              >
-                {isLoading ? 'Creating account...' : 'Sign up'}
-              </button>
-            </div>
-          </form>
-
-          <div className="mt-6 text-center text-sm">
-            <p className="text-gray-600">
-              Already have an account?{' '}
-              <Link href="/auth/login" className="font-medium text-green-700 hover:text-green-600">
-                Sign in
-              </Link>
-            </p>
           </div>
-        </div>
+
+          <div className="pt-6">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'Processing...' : 'Register'}
+            </button>
+          </div>
+
+          <div className="mt-4 text-center text-sm text-gray-600">
+            Already have an account?{' '}
+            <Link href="/auth/login" className="font-medium text-green-600 hover:text-green-500">
+              Sign in
+            </Link>
+          </div>
+        </form>
       </div>
     </div>
   );

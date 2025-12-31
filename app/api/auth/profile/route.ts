@@ -1,255 +1,311 @@
-// In app/api/auth/profile/route.ts
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
-import { verifyToken, hashPassword } from '@/lib/auth';
-import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
+import { RowDataPacket } from 'mysql2/promise';
+import * as fs from 'fs';
+import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
-// Interface for profile data
-interface ProfileData {
-  // Basic info
-  name?: string;
-  email?: string;
-  password?: string;
-  
-  // Contact info
-  phone?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  postal_code?: string;
-  country?: string;
-  
-  // Professional info
-  current_position?: string;
-  company?: string;
-  industry?: string;
-  years_of_experience?: number;
-  skills?: string; // Comma-separated
-  
-  // Education
-  highest_degree?: string;
-  field_of_study?: string;
-  institution?: string;
-  year_of_graduation?: number;
-  additional_certifications?: string;
-  
-  // Membership
-  membership_type?: string;
-  membership_number?: string;
-  membership_status?: string;
-  join_date?: string;
-  
-  // Interests
-  areas_of_interest?: string; // Comma-separated
-  
-  // Files
-  id_proof_path?: string;
-  degree_certificates_path?: string; // Comma-separated
-  cv_path?: string;
-}
+// Configure the upload directory
+const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'profile-pictures');
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// In app/api/auth/profile/route.ts
-export async function PUT(request: Request) {
+// GET endpoint to fetch user profile
+export async function GET(request: Request) {
+  const connection = await pool.getConnection();
+  
   try {
-    // Parse the request body
-    const requestData = await request.json() as Partial<ProfileData>;
-    console.log('Profile update request data:', JSON.stringify(requestData, null, 2));
-    
-    // Get token from cookies
-    const cookieHeader = request.headers.get('cookie');
-    const token = cookieHeader
-      ?.split('; ')
-      .find(row => row.trim().startsWith('token='))
-      ?.split('=')[1] || null;
+    // Get token from Authorization header
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
 
     if (!token) {
       return NextResponse.json(
-        { message: 'Authentication required' },
+        { success: false, message: 'Authentication required' },
         { status: 401 }
       );
     }
 
-    // Verify token
     const decoded = verifyToken(token);
-    
-    // Separate user and profile data
-    const userUpdate: Record<string, any> = {};
-    const profileUpdate: Record<string, any> = {};
-    
-    // User table fields
-    const userFields = ['name', 'email', 'password'];
-    
-    // Process user data
-    Object.entries(requestData).forEach(([key, value]) => {
-      if (userFields.includes(key) && value !== undefined && value !== '') {
-        userUpdate[key] = value;
-      } else if (value !== undefined) {
-        profileUpdate[key] = value;
-      }
-    });
-    
-    // Hash password if it's being updated
-    if (userUpdate.password) {
-      userUpdate.password = await hashPassword(userUpdate.password);
-    }
-    
-    const connection = await pool.getConnection();
-    
-    try {
-      await connection.beginTransaction();
-      
-      // Update user table if there are user fields to update
-      if (Object.keys(userUpdate).length > 0) {
-        await connection.query(
-          'UPDATE users SET ? WHERE id = ?',
-          [userUpdate, decoded.id]
-        );
-      }
-      
-      // Update or insert profile
-      if (Object.keys(profileUpdate).length > 0) {
-        // Check if profile exists
-        const [existingProfile] = await connection.query(
-          'SELECT id FROM user_profiles WHERE user_id = ?',
-          [decoded.id]
-        );
-        
-        if (existingProfile.length > 0) {
-          // Update existing profile
-          await connection.query(
-            'UPDATE user_profiles SET ? WHERE user_id = ?',
-            [profileUpdate, decoded.id]
-          );
-        } else {
-          // Insert new profile
-          await connection.query(
-            'INSERT INTO user_profiles SET ?',
-            [{ user_id: decoded.id, ...profileUpdate }]
-          );
-        }
-      }
-      
-      await connection.commit();
-      
-      // Get updated user data
-      const [users] = await connection.query(
-        `SELECT u.*, up.* 
-         FROM users u 
-         LEFT JOIN user_profiles up ON u.id = up.user_id 
-         WHERE u.id = ?`,
-        [decoded.id]
+    if (!decoded?.id) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid or expired token' },
+        { status: 401 }
       );
-      
-      const updatedUser = users[0];
-      
-      // Remove sensitive data
-      delete updatedUser.password;
-      delete updatedUser.refresh_token;
-      
-      return NextResponse.json({
-        message: 'Profile updated successfully',
-        user: updatedUser
-      });
-      
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
     }
 
-  } catch (error) {
-    console.error('Profile update error:', error);
+    // Fetch user data with profile
+    const [users] = await connection.query<RowDataPacket[]>(
+      `SELECT 
+        u.*, 
+        up.* 
+      FROM users u
+      LEFT JOIN user_profiles up ON u.id = up.user_id
+      WHERE u.id = ?`,
+      [decoded.id]
+    );
+
+    if (!users || users.length === 0) {
+      return NextResponse.json(
+        { success: false, message: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    const user = users[0];
+    
+    // Clean up sensitive data
+    delete user.password;
+    delete user.refresh_token;
+
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        personalInfo: {
+          fullName: user.full_name || user.name,
+          gender: user.gender,
+          dateOfBirth: user.date_of_birth,
+          idNumber: user.id_number,
+          profilePicture: user.profile_picture,
+          nationality: user.nationality,
+          placeOfBirth: user.place_of_birth,
+          phone: user.phone,
+          address: user.address,
+          city: user.city,
+          country: user.country,
+          postalCode: user.postal_code
+        }
+      }
+    });
+  } catch (error: any) {
+    console.error('Error in GET /api/auth/profile:', error);
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { 
+        success: false, 
+        message: 'Internal server error',
+        ...(process.env.NODE_ENV === 'development' && { error: error.message })
+      },
       { status: 500 }
     );
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 }
 
-async function verifyAndUpdateProfile(token: string, data: any) {
-  // Ensure token is a string and not 'undefined'
-  if (typeof token !== 'string' || token === 'undefined') {
-    console.error('Invalid token format:', token);
-    throw new Error('Invalid token format');
-  }
+// PUT endpoint to update user profile
+export async function PUT(request: Request) {
+  const connection = await pool.getConnection();
   
-  console.log('Token received for verification (first 10 chars):', token.substring(0, 10) + '...');
-  
-  if (!process.env.JWT_SECRET) {
-    console.error('JWT_SECRET is not configured');
-    throw new Error('JWT_SECRET is not configured');
-  }
-
   try {
-    console.log('Attempting to verify token...');
-    const decoded = verifyToken(token);
-    console.log('Successfully decoded token:', { 
-      id: decoded.id, 
-      email: decoded.email,
-      isAdmin: decoded.isAdmin,
-      iat: decoded.iat ? new Date(decoded.iat * 1000).toISOString() : null,
-      exp: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : null
-    });
-    
-    // Flatten the data structure and only include valid user fields
-    const updateData: Record<string, any> = {};
-    
-    // Define valid user fields that can be updated
-    const validUserFields = [
-      'first_name', 'last_name', 'phone', 'address', 'city', 'state', 
-      'postal_code', 'country', 'bio', 'profile_picture', 'company',
-      'job_title', 'website', 'twitter', 'linkedin', 'github', 'facebook',
-      'instagram', 'youtube', 'tiktok'
-    ];
-    
-    // Flatten the nested data structure
-    if (data.personalInfo) {
-      Object.entries(data.personalInfo).forEach(([key, value]) => {
-        if (validUserFields.includes(key) && value !== undefined) {
-          updateData[key] = value;
-        }
-      });
-    }
-    
-    // Add other top-level fields if they exist and are valid
-    Object.entries(data).forEach(([key, value]) => {
-      if (key !== 'personalInfo' && validUserFields.includes(key) && value !== undefined) {
-        updateData[key] = value;
-      }
-    });
-    
-    console.log('Prepared update data:', JSON.stringify(updateData, null, 2));
-    
-    if (Object.keys(updateData).length === 0) {
-      console.log('No valid fields to update');
+    // Get token from Authorization header
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+
+    if (!token) {
       return NextResponse.json(
-        { message: 'No valid fields to update' },
-        { status: 400 }
+        { success: false, message: 'Authentication required' },
+        { status: 401 }
       );
     }
-    
-    const connection = await pool.getConnection();
-    try {
-      await connection.query(
-        'UPDATE users SET ? WHERE id = ?',
-        [updateData, decoded.id]
+
+    const decoded = verifyToken(token);
+    if (!decoded?.id) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid or expired token' },
+        { status: 401 }
       );
-      
-      return NextResponse.json({ 
-        message: 'Profile updated successfully',
-        userId: decoded.id,
-        updatedFields: Object.keys(updateData)
-      });
-    } finally {
+    }
+
+    // Rest of your PUT endpoint code...
+    // ... (keep the rest of your existing PUT endpoint code)
+    
+  } catch (error) {
+    console.error('Error in PUT /api/auth/profile:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        message: 'Internal server error',
+        ...(process.env.NODE_ENV === 'development' && { error: error.message })
+      },
+      { status: 500 }
+    );
+  } finally {
+    if (connection) {
       connection.release();
     }
   }
-   catch (error) {
-    console.error('JWT verification failed:', error);
+}
+
+// PATCH endpoint to update user profile with file upload
+export async function PATCH(request: Request) {
+  const connection = await pool.getConnection();
+  
+  try {
+    // Verify authentication
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const decoded = verifyToken(token);
+    if (!decoded?.id) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    // Handle multipart form data
+    const formData = await request.formData();
+    const personalInfoStr = formData.get('personalInfo') as string;
+    const profilePicture = formData.get('profilePicture') as File | null;
+    const profilePictureUrl = formData.get('profilePictureUrl') as string | null;
+
+    // Parse the personalInfo JSON string
+    let personalInfo = {};
+    try {
+      personalInfo = personalInfoStr ? JSON.parse(personalInfoStr) : {};
+    } catch (error) {
+      console.error('Error parsing personalInfo:', error);
+      return NextResponse.json(
+        { success: false, message: 'Invalid personal information format' },
+        { status: 400 }
+      );
+    }
+
+    const profileUpdate: Record<string, any> = { ...personalInfo };
+
+    // Handle file upload if a new profile picture is provided
+    if (profilePicture && profilePicture.size > 0) {
+      const fileExtension = profilePicture.name.split('.').pop();
+      const fileName = `${uuidv4()}.${fileExtension}`;
+      const filePath = path.join(UPLOAD_DIR, fileName);
+      
+      try {
+        // Convert the file to a buffer and save it
+        const bytes = await profilePicture.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        await fs.promises.writeFile(filePath, buffer);
+        
+        // Store the relative path in the database
+        profileUpdate.profile_picture = `/uploads/profile-pictures/${fileName}`;
+      } catch (error) {
+        console.error('Error saving profile picture:', error);
+        return NextResponse.json(
+          { success: false, message: 'Failed to save profile picture' },
+          { status: 500 }
+        );
+      }
+    } else if (profilePictureUrl) {
+      // If it's a URL or base64 string
+      profileUpdate.profile_picture = profilePictureUrl;
+    }
+
+    // Start transaction
+    await connection.beginTransaction();
+
+    try {
+      // Update or create profile
+      const [existingProfile] = await connection.query<RowDataPacket[]>(
+        'SELECT id FROM user_profiles WHERE user_id = ?',
+        [decoded.id]
+      );
+
+      if (existingProfile?.length > 0) {
+        // Update existing profile
+        const updateFields = Object.keys(profileUpdate);
+        const updateValues = Object.values(profileUpdate);
+        const setClause = updateFields.map(field => `\`${field}\` = ?`).join(', ');
+        
+        await connection.query(
+          `UPDATE user_profiles SET ${setClause} WHERE user_id = ?`,
+          [...updateValues, decoded.id]
+        );
+      } else {
+        // Insert new profile
+        const insertFields = ['user_id', ...Object.keys(profileUpdate)];
+        const insertValues = [decoded.id, ...Object.values(profileUpdate)];
+        const placeholders = insertFields.map(() => '?').join(', ');
+        const columns = insertFields.map(field => `\`${field}\``).join(', ');
+        
+        await connection.query(
+          `INSERT INTO user_profiles (${columns}) VALUES (${placeholders})`,
+          insertValues
+        );
+      }
+
+      await connection.commit();
+      
+      // Fetch updated user data
+      const [users] = await connection.query<RowDataPacket[]>(
+        `SELECT 
+          u.*, 
+          up.* 
+        FROM users u
+        LEFT JOIN user_profiles up ON u.id = up.user_id
+        WHERE u.id = ?`,
+        [decoded.id]
+      );
+
+      // Clean up sensitive data
+      const updatedUser = users[0];
+      if (updatedUser) {
+        delete updatedUser.password;
+        delete updatedUser.refresh_token;
+      }
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Profile updated successfully',
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          name: updatedUser.name,
+          personalInfo: {
+            fullName: updatedUser.full_name || updatedUser.name,
+            gender: updatedUser.gender,
+            dateOfBirth: updatedUser.date_of_birth,
+            idNumber: updatedUser.id_number,
+            profilePicture: updatedUser.profile_picture,
+            nationality: updatedUser.nationality,
+            placeOfBirth: updatedUser.place_of_birth,
+            phone: updatedUser.phone,
+            address: updatedUser.address,
+            city: updatedUser.city,
+            country: updatedUser.country,
+            postalCode: updatedUser.postal_code
+          }
+        }
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error in PATCH /api/auth/profile:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error in PATCH /api/auth/profile:', error);
     return NextResponse.json(
-      { message: 'Invalid or expired token' },
-      { status: 401 }
+      { 
+        success: false, 
+        message: 'Internal server error',
+        ...(process.env.NODE_ENV === 'development' && { error: (error as Error).message })
+      },
+      { status: 500 }
     );
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 }

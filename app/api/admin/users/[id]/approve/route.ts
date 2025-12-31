@@ -1,125 +1,100 @@
+// app/api/users/[id]/approve/route.ts
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
-import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
-import { generateMembershipNumber } from '@/lib/membership';
-
-interface User extends RowDataPacket {
-  id: number;
-  name: string;
-  email: string;
-  is_approved: boolean;
-  membership_number: string | null;
-  created_at: Date;
-}
 
 export async function PATCH(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
-  let connection;
+  const resolvedParams = await params;
+  return handleApproveUser(resolvedParams.id);
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const resolvedParams = await params;
+  return handleApproveUser(resolvedParams.id);
+}
+
+async function handleApproveUser(userId: string) {
   try {
-    // Get the ID from the context params
-    const { id } = await Promise.resolve(context.params);
-    const userId = parseInt(id, 10);
+    console.log('Received request with user ID:', userId);
+    console.log('User ID from params:', userId);
     
-    if (isNaN(userId)) {
+    // Validate user ID
+    if (!userId || isNaN(Number(userId))) {
+      console.error('Invalid user ID:', userId);
       return NextResponse.json(
-        { message: 'Invalid user ID' },
+        { success: false, message: 'Invalid user ID' },
         { status: 400 }
       );
     }
 
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-
+    const connection = await pool.getConnection();
+    
     try {
-      // Check if user exists
-      const [users] = await connection.query<User[]>(
-        'SELECT * FROM users WHERE id = ? FOR UPDATE',
+      // First, check if user exists
+      const [users] = await connection.query(
+        'SELECT id, is_approved FROM users WHERE id = ?',
         [userId]
       );
 
-      if (users.length === 0) {
-        await connection.rollback();
+      if (!users || users.length === 0) {
         return NextResponse.json(
-          { message: 'User not found' },
+          { success: false, message: 'User not found' },
           { status: 404 }
         );
       }
 
       const user = users[0];
 
+      // If already approved, return success
       if (user.is_approved) {
-        await connection.rollback();
-        return NextResponse.json(
-          { 
-            message: 'User is already approved',
-            membership_number: user.membership_number
-          },
-          { status: 400 }
-        );
+        return NextResponse.json({
+          success: true,
+          message: 'User is already approved',
+          user: {
+            id: user.id,
+            isApproved: true
+          }
+        });
       }
 
-      // Generate and assign membership number
-      const membershipNumber = await generateMembershipNumber();
-      
-      // Update the user's approval status and set membership number
-      await connection.query<ResultSetHeader>(
-        'UPDATE users SET is_approved = TRUE, membership_number = ? WHERE id = ?',
-        [membershipNumber, userId]
+      // Update user approval status
+      await connection.query(
+        'UPDATE users SET is_approved = TRUE, updated_at = NOW() WHERE id = ?',
+        [userId]
       );
 
-      // Commit the transaction
-      await connection.commit();
-
-      // Send approval email with membership number
-      try {
-        const emailResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/send-approval-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: user.email,
-            name: user.name,
-            membershipNumber: membershipNumber
-          })
-        });
-
-        if (!emailResponse.ok) {
-          console.error('Failed to send approval email');
-        }
-      } catch (emailError) {
-        console.error('Error sending approval email:', emailError);
-      }
+      // Get updated user data
+      const [updatedUsers] = await connection.query(
+        'SELECT id, name, email, is_approved as isApproved FROM users WHERE id = ?',
+        [userId]
+      );
 
       return NextResponse.json({
         success: true,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          is_approved: true,
-          membership_number: membershipNumber,
-          created_at: user.created_at
-        }
+        message: 'User approved successfully',
+        user: updatedUsers[0]
       });
 
     } catch (error) {
-      await connection.rollback();
-      throw error;
+      console.error('Database error:', error);
+      return NextResponse.json(
+        { success: false, message: 'Database error' },
+        { status: 500 }
+      );
+    } finally {
+      connection.release();
     }
 
   } catch (error) {
-    console.error('Error in approve endpoint:', error);
+    console.error('Error approving user:', error);
     return NextResponse.json(
-      { 
-        message: error instanceof Error ? error.message : 'Internal server error',
-        success: false 
-      },
+      { success: false, message: 'Internal server error' },
       { status: 500 }
     );
-  } finally {
-    if (connection) connection.release();
   }
 }
