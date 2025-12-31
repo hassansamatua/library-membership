@@ -124,17 +124,20 @@ export async function PUT(request: Request) {
     // Rest of your PUT endpoint code...
     // ... (keep the rest of your existing PUT endpoint code)
     
-  } catch (error) {
-    console.error('Error in PUT /api/auth/profile:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' && { error: error.message })
-      },
-      { status: 500 }
-    );
-  } finally {
+  
+  } catch (error: unknown) {
+  console.error('Error in PUT /api/auth/profile:', error);
+  return NextResponse.json(
+    { 
+      success: false, 
+      message: 'Internal server error',
+      ...(process.env.NODE_ENV === 'development' && { 
+        error: error instanceof Error ? error.message : 'An unknown error occurred' 
+      })
+    },
+    { status: 500 }
+  );
+} finally {
     if (connection) {
       connection.release();
     }

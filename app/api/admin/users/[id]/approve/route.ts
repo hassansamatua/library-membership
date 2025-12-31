@@ -1,6 +1,14 @@
 // app/api/users/[id]/approve/route.ts
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
+import { RowDataPacket, ResultSetHeader } from 'mysql2';
+
+interface User extends RowDataPacket {
+  id: number;
+  is_approved: boolean;
+  name: string;
+  email: string;
+}
 
 export async function PATCH(
   request: Request,
@@ -36,10 +44,11 @@ async function handleApproveUser(userId: string) {
     
     try {
       // First, check if user exists
-      const [users] = await connection.query(
-        'SELECT id, is_approved FROM users WHERE id = ?',
+      const [rows] = await connection.query(
+        'SELECT id, is_approved, name, email FROM users WHERE id = ?',
         [userId]
       );
+      const users = rows as User[];
 
       if (!users || users.length === 0) {
         return NextResponse.json(
@@ -63,13 +72,13 @@ async function handleApproveUser(userId: string) {
       }
 
       // Update user approval status
-      await connection.query(
+      const [result] = await connection.query<ResultSetHeader>(
         'UPDATE users SET is_approved = TRUE, updated_at = NOW() WHERE id = ?',
         [userId]
       );
 
       // Get updated user data
-      const [updatedUsers] = await connection.query(
+      const [updatedUsers] = await connection.query<User[]>(
         'SELECT id, name, email, is_approved as isApproved FROM users WHERE id = ?',
         [userId]
       );

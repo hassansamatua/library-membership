@@ -23,8 +23,11 @@ import {
   FiLinkedin,
   FiGithub,
   FiTwitter,
-  FiGlobe
+  FiGlobe,
+  FiCreditCard,
+  FiPrinter
 } from 'react-icons/fi';
+import ReportModal from '@/components/admin/ReportModal';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 import { Bar, Pie } from 'react-chartjs-2';
 
@@ -103,6 +106,9 @@ export default function AdminDashboard() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Fetch users
   useEffect(() => {
@@ -218,6 +224,217 @@ export default function AdminDashboard() {
     }
   };
 
+  // Handle view/print ID card
+  const handleViewIdCard = (user: User) => {
+    // Open ID card in a new window for printing
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      // Basic ID card HTML template
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>ID Card - ${user.name}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+            body { 
+              font-family: 'Inter', sans-serif; 
+              margin: 0; 
+              padding: 20px;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 100vh;
+              background-color: #f3f4f6;
+            }
+            .id-card {
+              width: 350px;
+              background: white;
+              border-radius: 12px;
+              overflow: hidden;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            .id-header {
+              background: #10b981;
+              color: white;
+              padding: 16px;
+              text-align: center;
+            }
+            .id-photo {
+              width: 100px;
+              height: 100px;
+              border-radius: 50%;
+              margin: -50px auto 10px;
+              border: 4px solid white;
+              background: #e5e7eb;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              overflow: hidden;
+            }
+            .id-details {
+              padding: 20px;
+            }
+            .detail-row {
+              margin-bottom: 10px;
+              display: flex;
+            }
+            .detail-label {
+              font-weight: 500;
+              color: #6b7280;
+              min-width: 100px;
+            }
+            .detail-value {
+              flex: 1;
+              color: #111827;
+            }
+            .barcode {
+              text-align: center;
+              padding: 10px 0;
+              margin-top: 10px;
+              border-top: 1px dashed #d1d5db;
+            }
+            @media print {
+              body { background: white; }
+              .no-print { display: none; }
+              .id-card { box-shadow: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="id-card">
+            <div class="id-header">
+              <h2>Library Membership ID</h2>
+            </div>
+            <div class="id-photo">
+              <svg width="50" height="50" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z" fill="#9CA3AF"/>
+                <path d="M12 14.5C6.99 14.5 3 18.49 3 23.5C3 23.78 3.22 24 3.5 24H20.5C20.78 24 21 23.78 21 23.5C21 18.49 17.01 14.5 12 14.5Z" fill="#9CA3AF"/>
+              </svg>
+            </div>
+            <div class="id-details">
+              <div class="detail-row">
+                <div class="detail-label">Name:</div>
+                <div class="detail-value">${user.name}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Member ID:</div>
+                <div class="detail-value">${user.profile?.membership?.number || 'N/A'}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Member Since:</div>
+                <div class="detail-value">${new Date(user.createdAt).toLocaleDateString()}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Status:</div>
+                <div class="detail-value">${user.isApproved ? 'Active' : 'Inactive'}</div>
+              </div>
+              <div class="barcode">
+                <div style="font-family: 'Libre Barcode 39', monospace; font-size: 24px;">
+                  *${(user.id + 10000).toString().padStart(6, '0')}*
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="no-print" style="text-align: center; margin-top: 20px;">
+            <button onclick="window.print()" style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
+              Print ID Card
+            </button>
+            <button onclick="window.close()" style="padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Close
+            </button>
+          </div>
+          <script>
+            // Auto-print when the window loads
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            };
+          </script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  };
+
+  // Handle bulk download ID cards
+  const handleBulkDownloadIdCards = async (userIds: number[]) => {
+    // This is a simplified version. In a real app, you would:
+    // 1. Fetch all selected users' data
+    // 2. Generate ID cards for each user
+    // 3. Combine them into a single PDF or ZIP file
+    // 4. Trigger download
+    
+    // For now, we'll just open each ID card in a new tab
+    userIds.forEach(userId => {
+      const user = users.find(u => u.id === userId);
+      if (user) {
+        handleViewIdCard(user);
+      }
+    });
+    
+    toast.success(`Opening ID cards for ${userIds.length} users`);
+  };
+
+  // Handle report generation
+  const handleGenerateReport = async (type: string, startDate: string, endDate: string): Promise<void> => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (type) params.append('type', type);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      
+      const response = await fetch(`/api/admin/report?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate report');
+      }
+      
+      // Get the filename from the content-disposition header or use a default
+      const contentDisposition = response.headers.get('content-disposition');
+      const filename = contentDisposition 
+        ? contentDisposition.split('filename=')[1].replace(/"/g, '') 
+        : 'members-report.xlsx';
+      
+      // Create a blob from the response and trigger download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+      
+      toast.success('Report generated successfully');
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast.error('Failed to generate report');
+    }
+  };
+
+  // Toggle user selection for bulk actions
+  const toggleUserSelection = (userId: number) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
   // Handle reject user
   const handleRejectUser = async (userId: number) => {
     if (!confirm('Are you sure you want to reject this user?')) {
@@ -314,12 +531,70 @@ export default function AdminDashboard() {
               Back to Dashboard
             </button>
             <button
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('Authentication required');
+                  }
+                  
+                  // Generate and download report
+                  const response = await fetch('/api/admin/report', {
+                    headers: {
+                      'Authorization': `Bearer ${token}`
+                    }
+                  });
+                  
+                  if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || 'Failed to generate report');
+                  }
+                  
+                  // Get the filename from the content-disposition header or use a default
+                  const contentDisposition = response.headers.get('content-disposition');
+                  const filename = contentDisposition 
+                    ? contentDisposition.split('filename=')[1].replace(/"/g, '') 
+                    : 'members-report.xlsx';
+                  
+                  // Create a blob from the response and trigger download
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = filename;
+                  document.body.appendChild(a);
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                  a.remove();
+                  
+                  toast.success('Report generated successfully');
+                } catch (error) {
+                  console.error('Error generating report:', error);
+                  const errorMessage = error instanceof Error ? error.message : 'Failed to generate report';
+                  toast.error(errorMessage);
+                }
+              }}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center"
+            >
+              <FiFileText className="mr-2" />
+              Generate Report
+            </button>
+            <button
+              onClick={() => setIsReportModalOpen(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center"
+              disabled={isGenerating}
+            >
+              <FiFileText className="mr-2" />
+              Advanced Report
+            </button>
+            <button
               onClick={() => {
                 // Add logout logic here
                 router.push('/logout');
               }}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center"
             >
+              <FiX className="mr-2" />
               Logout
             </button>
           </div>
@@ -327,124 +602,183 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        <div className="bg-white shadow rounded-lg p-6">
-          {/* Search and filter */}
-          <div className="mb-6">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FiSearch className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+        {/* Search and filter */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="relative flex-1 max-w-md">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <FiSearch className="h-5 w-5 text-gray-400" />
             </div>
+            <input
+              type="text"
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
+          {selectedUsers.length > 0 && (
+            <div className="ml-4 flex space-x-2">
+              <button
+                onClick={() => handleBulkDownloadIdCards(selectedUsers)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                <FiDownload className="mr-2 h-4 w-4" />
+                Download {selectedUsers.length} ID Card{selectedUsers.length > 1 ? 's' : ''}
+              </button>
+              <button
+                onClick={() => setSelectedUsers([])}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                Clear Selection
+              </button>
+            </div>
+          )}
+        </div>
 
-          {/* Users table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+        {/* Users table */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                    checked={selectedUsers.length > 0 && selectedUsers.length === users.filter(u => 
+                      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      u.email.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).length}
+                    onChange={() => {
+                      const filteredUsers = users.filter(user => 
+                        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+                      );
+                      
+                      if (selectedUsers.length === filteredUsers.length) {
+                        setSelectedUsers([]);
+                      } else {
+                        setSelectedUsers(filteredUsers.map(user => user.id));
+                      }
+                    }}
+                  />
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {isLoading ? (
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <td colSpan={5} className="px-6 py-4 text-center">
+                    <div className="flex justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500"></div>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-4 text-center">
-                      <div className="flex justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500"></div>
-                      </div>
-                    </td>
-                  </tr>
-                ) : users.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
-                      No users found
-                    </td>
-                  </tr>
-                ) : (
-                  users
-                    .filter(user => 
-                      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      user.email.toLowerCase().includes(searchTerm.toLowerCase())
-                    )
-                    .map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="shrink-0 h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                              <FiUser className="h-6 w-6 text-green-600" />
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                            </div>
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                    No users found
+                  </td>
+                </tr>
+              ) : (
+                users
+                  .filter(user => 
+                    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+                  )
+                  .map((user) => (
+                    <tr key={user.id} className={`hover:bg-gray-50 ${selectedUsers.includes(user.id) ? 'bg-blue-50' : ''}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                          checked={selectedUsers.includes(user.id)}
+                          onChange={() => toggleUserSelection(user.id)}
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="shrink-0 h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                            <FiUser className="h-6 w-6 text-green-600" />
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {user.email}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            user.isApproved
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {user.isApproved ? 'Active' : 'Pending'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleViewUser(user.id)}
-                              className="text-blue-600 hover:text-blue-900"
-                              title="View details"
-                            >
-                              <FiEye className="h-5 w-5" />
-                            </button>
-                            {!user.isApproved && (
-                              <button
-                                onClick={() => handleApproveUser(user.id)}
-                                className="text-green-600 hover:text-green-900"
-                                title="Approve user"
-                              >
-                                <FiCheck className="h-5 w-5" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleRejectUser(user.id)}
-                              className="text-yellow-600 hover:text-yellow-900"
-                              title="Reject user"
-                            >
-                              <FiXCircle className="h-5 w-5" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteUser(user.id);
-                              }}
-                              className="text-red-600 hover:text-red-900"
-                              title="Delete user"
-                            >
-                              <FiTrash2 className="h-5 w-5" />
-                            </button>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">{user.name}</div>
                           </div>
-                        </td>
-                      </tr>
-                    ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {user.email}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          user.isApproved
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {user.isApproved ? 'Active' : 'Pending'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleViewIdCard(user)}
+                            className="text-purple-600 hover:text-purple-900"
+                            title="View ID Card"
+                          >
+                            <FiCreditCard className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleViewUser(user.id)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="View details"
+                          >
+                            <FiEye className="h-5 w-5" />
+                          </button>
+                          {!user.isApproved && (
+                            <button
+                              onClick={() => handleApproveUser(user.id)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Approve user"
+                            >
+                              <FiCheck className="h-5 w-5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRejectUser(user.id)}
+                            className="text-yellow-600 hover:text-yellow-900"
+                            title="Reject user"
+                          >
+                            <FiXCircle className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteUser(user.id);
+                            }}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete user"
+                          >
+                            <FiTrash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+              )}
+            </tbody>
+          </table>
         </div>
       </main>
+
+      {/* Report Generation Modal */}
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        onGenerate={handleGenerateReport}
+      />
 
       {/* User Details Modal */}
       {showUserModal && selectedUser && (

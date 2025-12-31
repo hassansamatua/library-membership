@@ -11,10 +11,13 @@ export async function GET(request: Request) {
     let token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
     
     if (!token) {
-      token = request.headers.get('cookie')
-        ?.split('; ')
-        .find(c => c.trim().startsWith('token='))
-        ?.split('=')[1];
+      const cookieHeader = request.headers.get('cookie');
+      token = cookieHeader
+        ? cookieHeader
+            .split('; ')
+            .find(c => c.trim().startsWith('token='))
+            ?.split('=')[1] || null
+        : null;
     }
 
     if (!token) {
@@ -102,7 +105,8 @@ export async function GET(request: Request) {
       }
     );
 
-  } catch (error) {
+  } catch (err) {
+    const error = err as Error;
     console.error('Error in /api/auth/me:', error);
     return new NextResponse(
       JSON.stringify({ 

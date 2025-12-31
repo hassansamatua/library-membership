@@ -27,13 +27,14 @@ type ProfileData = {
   professionalInfo: {
     occupation: string;
     company: string;
+    industry: string;
     yearsOfExperience: string;
     specialization: string;
     skills: string[];
   };
   education: {
     additionalCertifications: string | number | readonly string[] | undefined;
-    highestQualification: string;
+    highestDegree: string;
     institution: string;
     yearOfGraduation: string;
   }[];
@@ -51,6 +52,9 @@ type ProfileData = {
     cardNumber: string;
     expiryDate: string;
     cvv: string;
+    mobileProvider?: string;
+    mobileNumber?: string;
+    paymentReference?: string;
   };
   participation: {
     previousEvents: string[];
@@ -93,12 +97,13 @@ export default function CompleteProfilePage() {
     professionalInfo: {
       occupation: '',
       company: '',
+      industry: '',
       yearsOfExperience: '',
       specialization: '',
       skills: []
     },
     education: [{
-      highestQualification: '',
+      highestDegree: '',
       institution: '',
       yearOfGraduation: '',
       additionalCertifications: ''
@@ -181,13 +186,15 @@ export default function CompleteProfilePage() {
         }
       }));
     }
-  } catch (error) {
-    console.error('Error fetching profile:', error);
-    toast.error('Failed to load profile data');
-    if (error.message === 'No authentication token found' || error.message.includes('401')) {
-      router.push('/auth/login');
-    }
-  } finally {
+  } catch (error: unknown) {
+  console.error('Error fetching profile:', error);
+  toast.error('Failed to load profile data');
+  if (error instanceof Error && 
+      (error.message === 'No authentication token found' || 
+       error.message.includes('401'))) {
+    router.push('/auth/login');
+  }
+} finally {
     setIsLoading(false);
   }
 }, [router]);
@@ -305,7 +312,17 @@ export default function CompleteProfilePage() {
 
       // Handle profile picture upload
       if (formData.personalInfo.profilePicture) {
-        if (formData.personalInfo.profilePicture instanceof File) {
+        // Type guard to check if profilePicture is a File
+        const isFile = (obj: any): obj is File => {
+          return obj instanceof File || 
+                 (typeof obj === 'object' && 
+                  obj !== null && 
+                  typeof obj.name === 'string' && 
+                  typeof obj.size === 'number' && 
+                  typeof obj.type === 'string');
+        };
+        
+        if (isFile(formData.personalInfo.profilePicture)) {
           formDataToSend.append('profilePicture', formData.personalInfo.profilePicture);
         } else if (typeof formData.personalInfo.profilePicture === 'string') {
           // If it's a base64 string or URL
@@ -656,8 +673,8 @@ export default function CompleteProfilePage() {
                     id="currentPosition"
                     name="currentPosition"
                     className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                    value={formData.professionalInfo.currentPosition}
-                    onChange={(e) => handleInputChange('professionalInfo', 'currentPosition', e.target.value)}
+                    value={formData.professionalInfo.occupation}
+onChange={(e) => handleInputChange('professionalInfo', 'occupation', e.target.value)}
                   />
                 </div>
               </div>
@@ -778,26 +795,6 @@ export default function CompleteProfilePage() {
                     </select>
                   </div>
                 </div>
-                {/* Field of Study */}
-                <div className="sm:col-span-3">
-                  <label htmlFor={`fieldOfStudy-${index}`} className="block text-sm font-medium text-gray-700">
-                    Field of Study
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      id={`fieldOfStudy-${index}`}
-                      name={`fieldOfStudy-${index}`}
-                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                      value={edu.fieldOfStudy}
-                      onChange={(e) => {
-                        const newEducation = [...formData.education];
-                        newEducation[index] = { ...newEducation[index], fieldOfStudy: e.target.value };
-                        handleInputChange('education', 'education', newEducation);
-                      }}
-                    />
-                  </div>
-                </div>
                 {/* Institution */}
                 <div className="sm:col-span-3">
                   <label htmlFor={`institution-${index}`} className="block text-sm font-medium text-gray-700">
@@ -872,11 +869,9 @@ export default function CompleteProfilePage() {
                     ...formData.education,
                     {
                       highestDegree: '',
-                      fieldOfStudy: '',
                       institution: '',
                       yearOfGraduation: '',
-                      additionalCertifications: '',
-                      achievements: ''
+                      additionalCertifications: ''
                     }
                   ];
                   handleInputChange('education', 'education', newEducation);
