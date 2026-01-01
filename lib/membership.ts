@@ -41,7 +41,9 @@ export async function generateMembershipNumber(): Promise<string> {
   } catch (error) {
     await connection.rollback();
     console.error('Error generating membership number:', error);
-    throw new Error('Failed to generate membership number');
+    const err = new Error('Failed to generate membership number');
+    (err as any).cause = error;
+    throw err;
   } finally {
     connection.release();
   }

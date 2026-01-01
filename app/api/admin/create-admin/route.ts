@@ -4,6 +4,13 @@ import bcrypt from 'bcryptjs';
 
 export async function POST(request: Request) {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { message: 'Not found' },
+        { status: 404 }
+      );
+    }
+
     const { name, email, password } = await request.json();
     
     // Hash the password

@@ -137,22 +137,8 @@ export default function CompleteProfilePage() {
   const fetchProfile = useCallback(async () => {
   try {
     setIsLoading(true);
-    
-    // Get token from cookies
-    const token = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('token='))
-      ?.split('=')[1];
 
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    const response = await fetch('/api/auth/profile', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    const response = await fetch('/api/auth/profile', { credentials: 'include' });
     
     if (!response.ok) {
       throw new Error('Failed to fetch profile');
@@ -163,26 +149,48 @@ export default function CompleteProfilePage() {
     
     if (data.success && data.user) {
       const userData = data.user;
+      const profile = userData.profile || {};
+      const membershipNumber = userData.membershipNumber || profile.membership?.membershipNumber || '';
+      setFormattedMembershipNumber(membershipNumber);
       setFormData(prev => ({
         ...prev,
         personalInfo: {
           ...prev.personalInfo,
-          fullName: userData.name || userData.fullName || '',
-          gender: userData.gender || userData.personalInfo?.gender || '',
-          dateOfBirth: userData.dateOfBirth || userData.personalInfo?.dateOfBirth || userData.date_of_birth || '',
-          idNumber: userData.idNumber || userData.personalInfo?.idNumber || userData.id_number || '',
-          profilePicture: userData.profilePicture || userData.personalInfo?.profilePicture || userData.profile_picture || null,
-          nationality: userData.nationality || userData.personalInfo?.nationality || 'Tanzanian',
-          placeOfBirth: userData.placeOfBirth || userData.personalInfo?.placeOfBirth || userData.place_of_birth || '',
+          fullName: profile.personalInfo?.fullName || userData.name || '',
+          gender: profile.personalInfo?.gender || '',
+          dateOfBirth: profile.personalInfo?.dateOfBirth || '',
+          idNumber: profile.personalInfo?.idNumber || '',
+          profilePicture: profile.personalInfo?.profilePicture || null,
+          nationality: profile.personalInfo?.nationality || 'Tanzanian',
+          placeOfBirth: profile.personalInfo?.placeOfBirth || '',
         },
         contactInfo: {
           ...prev.contactInfo,
-          email: userData.email || '',
-          phone: userData.personalInfo?.phone || userData.phone || '',
-          address: userData.personalInfo?.address || userData.address || '',
-          city: userData.personalInfo?.city || userData.city || 'Dar es Salaam',
-          country: userData.personalInfo?.country || userData.country || 'Tanzania',
-          postalCode: userData.personalInfo?.postalCode || userData.postal_code || ''
+          socialMedia: profile.contactInfo?.socialMedia || '',
+          email: profile.contactInfo?.email || userData.email || '',
+          phone: profile.contactInfo?.phone || '',
+          address: profile.contactInfo?.address || '',
+          city: profile.contactInfo?.city || 'Dar es Salaam',
+          country: profile.contactInfo?.country || 'Tanzania',
+          postalCode: profile.contactInfo?.postalCode || ''
+        },
+        professionalInfo: {
+          ...prev.professionalInfo,
+          ...(profile.professionalInfo || {})
+        },
+        education: Array.isArray(profile.education) && profile.education.length > 0 ? profile.education : prev.education,
+        membership: {
+          ...prev.membership,
+          ...(profile.membership || {}),
+          membershipNumber
+        },
+        payment: {
+          ...prev.payment,
+          ...(profile.payment || {})
+        },
+        participation: {
+          ...prev.participation,
+          ...(profile.participation || {})
         }
       }));
     }
@@ -277,18 +285,6 @@ export default function CompleteProfilePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Check for authentication token
-    const token = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('token='))
-      ?.split('=')[1];
-
-    if (!token) {
-      toast.error('Please log in to continue');
-      router.push('/auth/login');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
@@ -297,18 +293,30 @@ export default function CompleteProfilePage() {
 
       // Add all form data to FormData
       formDataToSend.append('personalInfo', JSON.stringify({
+        fullName: formData.personalInfo.fullName,
         name: formData.personalInfo.fullName,
         gender: formData.personalInfo.gender,
         date_of_birth: formData.personalInfo.dateOfBirth,
         id_number: formData.personalInfo.idNumber,
         nationality: formData.personalInfo.nationality,
         place_of_birth: formData.personalInfo.placeOfBirth,
+      }));
+
+      formDataToSend.append('contactInfo', JSON.stringify({
+        socialMedia: formData.contactInfo.socialMedia,
+        email: formData.contactInfo.email,
         phone: formData.contactInfo.phone,
         address: formData.contactInfo.address,
         city: formData.contactInfo.city,
         country: formData.contactInfo.country,
-        postal_code: formData.contactInfo.postalCode
+        postalCode: formData.contactInfo.postalCode
       }));
+
+      formDataToSend.append('professionalInfo', JSON.stringify(formData.professionalInfo));
+      formDataToSend.append('education', JSON.stringify(formData.education));
+      formDataToSend.append('membership', JSON.stringify(formData.membership));
+      formDataToSend.append('payment', JSON.stringify(formData.payment));
+      formDataToSend.append('participation', JSON.stringify(formData.participation));
 
       // Handle profile picture upload
       if (formData.personalInfo.profilePicture) {
@@ -330,13 +338,23 @@ export default function CompleteProfilePage() {
         }
       }
 
+      if (formData.documents.idProof) {
+        formDataToSend.append('idProof', formData.documents.idProof);
+      }
+
+      if (Array.isArray(formData.documents.degreeCertificates) && formData.documents.degreeCertificates.length > 0) {
+        for (const cert of formData.documents.degreeCertificates) {
+          formDataToSend.append('degreeCertificates', cert);
+        }
+      }
+
+      if (formData.documents.cv) {
+        formDataToSend.append('cv', formData.documents.cv);
+      }
+
       const response = await fetch('/api/auth/profile', {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`
-          // Don't set Content-Type header when using FormData,
-          // the browser will set it with the correct boundary
-        },
+        credentials: 'include',
         body: formDataToSend
       });
 

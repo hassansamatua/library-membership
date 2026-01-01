@@ -6,7 +6,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
   try {
-    const { email, name } = await request.json();
+    const { email, name, membershipNumber } = await request.json();
 
     if (!email || !name) {
       return NextResponse.json(
@@ -30,11 +30,13 @@ const { data, error } = await resend.emails.send({
         Your account has been approved by our team. You can now log in and start using all the features of our platform.
       </p>
 
+      ${membershipNumber ? `
       <div style="background-color: #F3F4F6; padding: 16px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0; font-weight: 500; color: #111827;">Your Membership Number:</p>
         <p style="font-size: 24px; font-weight: 700; color: #10B981; margin: 8px 0 0 0;">${membershipNumber}</p>
         <p style="font-size: 14px; color: #6B7280; margin: 4px 0 0 0;">Please keep this number safe for future reference.</p>
       </div>
+      ` : ''}
       
       <div style="margin: 30px 0;">
         <a 

@@ -4,7 +4,38 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { FiUser, FiCalendar, FiMail, FiPhone, FiMapPin, FiBriefcase, FiCheckCircle, FiAlertCircle, FiArrowRight } from "react-icons/fi";
+import { FiUser, FiCalendar, FiMail, FiPhone, FiMapPin, FiBriefcase, FiCheckCircle, FiAlertCircle, FiArrowRight, FiCreditCard } from "react-icons/fi";
+
+type MembershipStatusResponse = {
+  success: boolean;
+  message?: string;
+  cycle?: {
+    year: number;
+    startDate: string;
+    dueDate: string;
+    expiryDate: string;
+  };
+  plan?: {
+    type: 'personal' | 'organization';
+    newUser: boolean;
+  };
+  fees?: {
+    baseAmount: number;
+    penaltyAmount: number;
+    totalDue: number;
+    currency: string;
+  };
+  membership?: {
+    membershipNumber: string;
+    membershipType: string;
+    status: string;
+    paymentStatus: string;
+    joinedDate: string;
+    expiryDate: string;
+    amountPaid: number | string;
+  } | null;
+  canAccessIdCard?: boolean;
+};
 
 const calculateProfileCompletion = (user: any) => {
   if (!user) return 0;
@@ -32,6 +63,8 @@ export default function DashboardPage() {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const router = useRouter();
   const [profileCompletion, setProfileCompletion] = useState(0);
+  const [membershipStatus, setMembershipStatus] = useState<MembershipStatusResponse | null>(null);
+  const [isMembershipLoading, setIsMembershipLoading] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -45,6 +78,26 @@ export default function DashboardPage() {
       setProfileCompletion(completion);
     }
   }, [user]);
+
+  useEffect(() => {
+    const loadMembershipStatus = async () => {
+      try {
+        if (!isAuthenticated) return;
+        setIsMembershipLoading(true);
+        const res = await fetch('/api/membership/status', { credentials: 'include' });
+        const data = (await res.json().catch(() => ({}))) as MembershipStatusResponse;
+        if (!res.ok) {
+          setMembershipStatus({ success: false, message: data.message || 'Failed to load membership status' });
+          return;
+        }
+        setMembershipStatus(data);
+      } finally {
+        setIsMembershipLoading(false);
+      }
+    };
+
+    loadMembershipStatus();
+  }, [isAuthenticated]);
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -115,11 +168,92 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Membership Payment Status */}
+        <div className="bg-white overflow-hidden shadow rounded-lg mb-6">
+          <div className="px-4 py-5 sm:px-6 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Membership Payment</h3>
+              <p className="mt-1 max-w-2xl text-sm text-gray-500">Your current membership payment status.</p>
+            </div>
+            <FiCreditCard className="h-6 w-6 text-green-600" />
+          </div>
+          <div className="px-4 py-5 sm:p-6">
+            {isMembershipLoading ? (
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-green-500"></div>
+                <span className="ml-3 text-sm text-gray-600">Loading membership status...</span>
+              </div>
+            ) : membershipStatus?.success ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Cycle: <span className="font-medium text-gray-900">{membershipStatus.cycle?.year}</span>
+                  </div>
+                  <div>
+                    {membershipStatus.canAccessIdCard ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Paid / Active
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        Payment Required
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-md p-4">
+                    <div className="text-xs text-gray-500">Total due</div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {membershipStatus.fees?.currency || 'TZS'} {Number(membershipStatus.fees?.totalDue || 0).toLocaleString('en-US')}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">Due date: {membershipStatus.cycle?.dueDate}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-md p-4">
+                    <div className="text-xs text-gray-500">Membership #</div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {membershipStatus.membership?.membershipNumber || user?.membershipNumber || 'N/A'}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">Expiry: {membershipStatus.membership?.expiryDate || membershipStatus.cycle?.expiryDate}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-md p-4">
+                    <div className="text-xs text-gray-500">Plan</div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {membershipStatus.plan?.type === 'organization' ? 'Organization' : (membershipStatus.plan?.newUser ? 'Personal (New)' : 'Personal (Renewal)')}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">Penalty: {membershipStatus.fees?.currency || 'TZS'} {Number(membershipStatus.fees?.penaltyAmount || 0).toLocaleString('en-US')}</div>
+                  </div>
+                </div>
+
+                {!membershipStatus.canAccessIdCard && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => {
+                        const type = membershipStatus.plan?.type || 'personal';
+                        const newUser = membershipStatus.plan?.newUser ? 'true' : 'false';
+                        router.push(`/dashboard/subscribe?type=${type}&newUser=${newUser}`);
+                      }}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                      Pay / Renew
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-700">
+                {membershipStatus?.message || 'Membership status unavailable.'}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Profile Completion Card */}
         {profileCompletion < 100 && (
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r">
             <div className="flex">
-              <div className="flex-shrink-0">
+              <div className="shrink-0">
                 <FiAlertCircle className="h-5 w-5 text-yellow-400" aria-hidden="true" />
               </div>
               <div className="ml-3">
@@ -129,7 +263,7 @@ export default function DashboardPage() {
                   </p>
                   <button
                     onClick={() => router.push('/dashboard/complete-profile')}
-                    className="ml-4 flex-shrink-0 text-sm font-medium text-yellow-700 hover:text-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                    className="ml-4 shrink-0 text-sm font-medium text-yellow-700 hover:text-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                   >
                     Complete Profile <span aria-hidden="true">&rarr;</span>
                   </button>
@@ -157,14 +291,14 @@ export default function DashboardPage() {
             >
               <div className="p-5">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 bg-green-100 rounded-md p-3">
+                  <div className="shrink-0 bg-green-100 rounded-md p-3">
                     {action.icon}
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <h3 className="text-lg font-medium text-gray-900">{action.title}</h3>
                     <p className="mt-1 text-sm text-gray-500">{action.description}</p>
                   </div>
-                  <div className="ml-5 flex-shrink-0">
+                  <div className="ml-5 shrink-0">
                     <FiArrowRight className="h-5 w-5 text-gray-400" />
                   </div>
                 </div>

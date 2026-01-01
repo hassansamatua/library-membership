@@ -6,10 +6,12 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function AdminDashboard() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
+    if (isLoading) return;
+
     if (!isAuthenticated) {
       router.push('/auth/login');
       return;
@@ -19,9 +21,9 @@ export default function AdminDashboard() {
       router.push('/dashboard');
       return;
     }
-  }, [user, isAuthenticated, router]);
+  }, [user, isAuthenticated, isLoading, router]);
 
-  if (!isAuthenticated || !user?.isAdmin) {
+  if (isLoading || !isAuthenticated || !user?.isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600"></div>

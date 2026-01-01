@@ -6,9 +6,11 @@ import { cookies } from 'next/headers';
 
 export async function GET(req: Request) {
   try {
-    // Get token from cookies
-    const cookieStore = cookies();
-    const token = cookieStore.get('token')?.value;
+    const authHeader = req.headers.get('authorization');
+    const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const cookieStore = await cookies();
+    const cookieToken = cookieStore.get('token')?.value;
+    const token = authToken || cookieToken;
     
     if (!token) {
       return new NextResponse('Authentication required', { status: 401 });
@@ -29,7 +31,7 @@ export async function GET(req: Request) {
     const [rows] = await pool.query(`
       SELECT u.*, p.* 
       FROM users u
-      LEFT JOIN profiles p ON u.id = p.user_id
+      LEFT JOIN user_profiles p ON u.id = p.user_id
       ORDER BY u.created_at DESC
     `) as [any[], any];
 

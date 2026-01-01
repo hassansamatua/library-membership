@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { ResultSetHeader, RowDataPacket, PoolConnection } from 'mysql2/promise';
+import { cookies } from 'next/headers';
 
 export async function DELETE(
   request: NextRequest,
@@ -22,7 +23,10 @@ export async function DELETE(
     }
 
     const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
+    const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const cookieStore = await cookies();
+    const cookieToken = cookieStore.get('token')?.value;
+    const token = authToken || cookieToken;
     
     if (!token) {
       return NextResponse.json(

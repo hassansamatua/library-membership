@@ -2,12 +2,18 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 interface User extends RowDataPacket {
   id: number;
   is_approved: boolean;
   name: string;
   email: string;
+  membership_number?: string | null;
 }
 
 export async function PATCH(
@@ -15,7 +21,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const resolvedParams = await params;
-  return handleApproveUser(resolvedParams.id);
+  return handleApproveUser(request, resolvedParams.id);
 }
 
 export async function POST(
@@ -23,13 +29,43 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const resolvedParams = await params;
-  return handleApproveUser(resolvedParams.id);
+  return handleApproveUser(request, resolvedParams.id);
 }
 
-async function handleApproveUser(userId: string) {
+async function handleApproveUser(request: Request, userId: string) {
   try {
     console.log('Received request with user ID:', userId);
     console.log('User ID from params:', userId);
+
+    const authHeader = request.headers.get('authorization');
+    const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const cookieStore = await cookies();
+    const cookieToken = cookieStore.get('token')?.value;
+    const token = authToken || cookieToken;
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    let decoded;
+    try {
+      decoded = verifyToken(token);
+    } catch {
+      return NextResponse.json(
+        { success: false, message: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    if (!decoded?.isAdmin) {
+      return NextResponse.json(
+        { success: false, message: 'Admin access required' },
+        { status: 403 }
+      );
+    }
     
     // Validate user ID
     if (!userId || isNaN(Number(userId))) {
@@ -45,7 +81,10 @@ async function handleApproveUser(userId: string) {
     try {
       // First, check if user exists
       const [rows] = await connection.query(
-        'SELECT id, is_approved, name, email FROM users WHERE id = ?',
+        `SELECT u.id, u.is_approved, u.name, u.email, up.membership_number
+         FROM users u
+         LEFT JOIN user_profiles up ON u.id = up.user_id
+         WHERE u.id = ?`,
         [userId]
       );
       const users = rows as User[];
@@ -79,9 +118,55 @@ async function handleApproveUser(userId: string) {
 
       // Get updated user data
       const [updatedUsers] = await connection.query<User[]>(
-        'SELECT id, name, email, is_approved as isApproved FROM users WHERE id = ?',
+        `SELECT u.id, u.name, u.email, u.is_approved as isApproved, up.membership_number
+         FROM users u
+         LEFT JOIN user_profiles up ON u.id = up.user_id
+         WHERE u.id = ?`,
         [userId]
       );
+
+      try {
+        await resend.emails.send({
+          from: 'TLA <onboarding@resend.dev>',
+          to: updatedUsers[0].email,
+          subject: 'Your Account Has Been Approved!',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1 style="color: #111827; font-size: 24px; margin-bottom: 20px;">
+                Welcome, ${updatedUsers[0].name}!
+              </h1>
+              <p style="color: #374151; line-height: 1.6; margin-bottom: 20px;">
+                Your account has been approved. You can now log in.
+              </p>
+              ${updatedUsers[0].membership_number ? `
+              <div style="background-color: #F3F4F6; padding: 16px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; font-weight: 500; color: #111827;">Membership Number:</p>
+                <p style="font-size: 24px; font-weight: 700; color: #10B981; margin: 8px 0 0 0;">${updatedUsers[0].membership_number}</p>
+              </div>
+              ` : ''}
+              <div style="margin: 30px 0;">
+                <a 
+                  href="${process.env.NEXT_PUBLIC_APP_URL}/auth/login" 
+                  style="
+                    display: inline-block; 
+                    padding: 12px 24px; 
+                    background-color: #10B981; 
+                    color: white; 
+                    text-decoration: none; 
+                    border-radius: 6px;
+                    font-weight: 500;
+                    font-size: 16px;
+                  "
+                >
+                  Log In
+                </a>
+              </div>
+            </div>
+          `,
+        });
+      } catch (emailError) {
+        console.error('Failed to send approval email:', emailError);
+      }
 
       return NextResponse.json({
         success: true,

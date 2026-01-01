@@ -5,6 +5,13 @@ import { hashPassword } from '@/lib/auth';
 
 export async function POST() {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { message: 'Not found' },
+        { status: 404 }
+      );
+    }
+
     const email = 'admin@example.com';
     const password = 'admin123';
     

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { ResultSetHeader } from 'mysql2';
+ import { cookies } from 'next/headers';
+ import bcrypt from 'bcryptjs';
 
 export async function POST(
   request: NextRequest,
@@ -13,7 +15,10 @@ export async function POST(
     
     // Get token from Authorization header
     const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
+    const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const cookieStore = await cookies();
+    const cookieToken = cookieStore.get('token')?.value;
+    const token = authToken || cookieToken;
     console.log('Auth token present:', !!token);
     
     if (!token) {
@@ -42,7 +47,6 @@ export async function POST(
     }
 
     // Hash the new password
-    const bcrypt = require('bcryptjs');
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Update password in database

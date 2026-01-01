@@ -2,10 +2,33 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { Footer } from "@/components/web/footer";
 import { Navbar } from "@/components/web/navbar";
+import { useEffect } from "react";
+
+const calculateProfileCompletion = (user: any) => {
+  if (!user) return 0;
+
+  const profile = user.profile || {};
+  let completedFields = 0;
+  const totalFields = 10;
+
+  if (profile.personalInfo?.fullName) completedFields++;
+  if (profile.personalInfo?.dateOfBirth) completedFields++;
+  if (profile.contactInfo?.phone) completedFields++;
+  if (profile.contactInfo?.address) completedFields++;
+  if (profile.professionalInfo?.occupation) completedFields++;
+  if (profile.education?.length > 0) completedFields++;
+  if (profile.membership?.membershipType) completedFields++;
+  if (profile.payment?.paymentMethod) completedFields++;
+  if (profile.participation?.areasOfInterest?.length > 0) completedFields++;
+  if (profile.documents?.idProof) completedFields++;
+
+  return Math.round((completedFields / totalFields) * 100);
+};
 
 export default function DashboardLayout({
   children,
@@ -14,6 +37,19 @@ export default function DashboardLayout({
 }) {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
+
+    const completion = calculateProfileCompletion(user);
+    if (completion < 90 && pathname !== '/dashboard/complete-profile' && pathname !== '/dashboard/subscribe') {
+      router.push('/dashboard/complete-profile');
+    }
+  }, [user, pathname, router]);
 
   const handleLogout = async () => {
     try {

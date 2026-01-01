@@ -34,6 +34,7 @@ export async function middleware(request: NextRequest) {
 
   try {
     console.log('[Middleware] Verifying token...');
+    console.log('[Middleware] Token (first 20 chars):', token ? token.substring(0, 20) + '...' : 'null');
     // Verify token by making a request to the /api/auth/me endpoint
     const meUrl = new URL('/api/auth/me', request.url);
     console.log(`[Middleware] Calling ${meUrl.toString()}`);
@@ -64,15 +65,15 @@ export async function middleware(request: NextRequest) {
       isApproved: userData.is_approved
     }));
     
-    // Check if user is approved
-    if (userData.is_approved === false && !pathname.startsWith('/auth/pending-approval')) {
-      console.log('[Middleware] User not approved, redirecting to pending approval page');
+    // Check if user is approved (bypass for admin users)
+    const isAdmin = Boolean(userData.isAdmin || userData.is_admin);
+    if (!isAdmin && userData.is_approved === false && !pathname.startsWith('/auth/pending-approval')) {
+      console.log('[Middleware] Non-admin user not approved, redirecting to pending approval page');
       return NextResponse.redirect(new URL('/auth/pending-approval', request.url));
     }
     
     // If trying to access admin routes without admin privileges
     if (pathname.startsWith('/admin')) {
-      const isAdmin = Boolean(userData.isAdmin || userData.is_admin);
       console.log(`[Middleware] Admin route access - isAdmin: ${isAdmin}`);
       
       if (!isAdmin) {
