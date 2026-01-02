@@ -61,7 +61,7 @@ export default function AdminMembershipPage() {
   const [activeTab, setActiveTab] = useState<'types' | 'cycles' | 'settings'>('types');
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
   const [membershipCycles, setMembershipCycles] = useState<MembershipCycle[]>([]);
-  const [membershipSettings, setMembershipSettings] = useState<MembershipSetting[]>([]);
+  const [membershipSettings, setMembershipSettings] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -256,10 +256,10 @@ export default function AdminMembershipPage() {
   };
 
   const getFilteredData = () => {
-    let data = [];
-    if (activeTab === 'types') data = membershipTypes;
-    else if (activeTab === 'cycles') data = membershipCycles;
-    else if (activeTab === 'settings') data = membershipSettings;
+    let data: any[] = [];
+    if (activeTab === 'types') data = Array.isArray(membershipTypes) ? membershipTypes : [];
+    else if (activeTab === 'cycles') data = Array.isArray(membershipCycles) ? membershipCycles : [];
+    else if (activeTab === 'settings') data = membershipSettings ? [membershipSettings] : [];
 
     return data.filter(item =>
       Object.values(item).some(value =>

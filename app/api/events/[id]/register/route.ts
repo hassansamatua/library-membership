@@ -1,0 +1,68 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { pool } from '@/lib/db';
+import { verifyToken } from '@/lib/auth';
+import { cookies } from 'next/headers';
+
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const token = await getAuthToken(request);
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const decoded = verifyToken(token);
+    const userId = decoded.id;
+    const eventId = parseInt(params.id);
+
+    const connection = await pool.getConnection();
+    try {
+      // Check if user is already registered
+      const [existingRegistration] = await connection.query(
+        'SELECT id FROM event_registrations WHERE event_id = ? AND user_id = ?',
+        [eventId, userId]
+      );
+
+      if (existingRegistration.length > 0) {
+        return NextResponse.json({ error: 'Already registered for this event' }, { status: 400 });
+      }
+
+      // Check if event is fully booked
+      const [eventInfo] = await connection.query(
+        'SELECT max_attendees, (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = ?) as current_attendees FROM events WHERE id = ?',
+        [eventId, eventId]
+      );
+
+      if (eventInfo.length === 0) {
+        return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+      }
+
+      const event = eventInfo[0];
+      if (event.current_attendees >= event.max_attendees) {
+        return NextResponse.json({ error: 'Event is fully booked' }, { status: 400 });
+      }
+
+      // Register for event
+      await connection.query(
+        'INSERT INTO event_registrations (event_id, user_id, registered_at) VALUES (?, ?, NOW())',
+        [eventId, userId]
+      );
+
+      return NextResponse.json({ success: true });
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error registering for event:', error);
+    return NextResponse.json({ error: 'Failed to register for event' }, { status: 500 });
+  }
+}
+
+// Helper function to get auth token (same as other APIs)
+async function getAuthToken(request: Request) {
+  const authHeader = request.headers.get('authorization');
+  const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+  if (authToken) return authToken;
+
+  const cookieStore = await cookies();
+  return cookieStore.get('token')?.value || null;
+}

@@ -23,6 +23,8 @@ export async function POST(
     const resolvedParams = await params;
     const userId = resolvedParams.id;
     
+    console.log('Rejecting user:', userId);
+    
     // Get rejection reason from request body
     const body = await request.json().catch(() => ({}));
     const rejectionReason = body.reason || 'No specific reason provided';
@@ -91,12 +93,17 @@ export async function POST(
         [userId]
       );
 
+      console.log('Database update result:', result);
+
       if (!result.affectedRows) {
+        console.error('No rows affected when rejecting user:', userId);
         return NextResponse.json(
           { success: false, message: 'Failed to reject user' },
           { status: 500 }
         );
       }
+
+      console.log('User rejected successfully:', userId);
 
       try {
         await resend.emails.send({

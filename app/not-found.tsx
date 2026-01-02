@@ -1,7 +1,20 @@
+"use client";
+
 import Link from 'next/link';
-import { FiAlertTriangle, FiHome, FiArrowRight } from 'react-icons/fi';
+import { FiAlertTriangle, FiHome, FiArrowRight, FiArrowLeft } from 'react-icons/fi';
+import { useRouter } from 'next/navigation';
 
 export default function NotFound() {
+  const router = useRouter();
+
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 text-center">
@@ -19,6 +32,14 @@ export default function NotFound() {
         </p>
         
         <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+          <button 
+            onClick={handleGoBack}
+            className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200"
+          >
+            <FiArrowLeft className="mr-2 h-5 w-5" />
+            Go Back
+          </button>
+          
           <Link 
             href="/"
             className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition-colors duration-200"

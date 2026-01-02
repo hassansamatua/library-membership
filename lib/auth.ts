@@ -79,4 +79,25 @@ export interface User extends RowDataPacket {
   is_admin: boolean;
   is_approved: boolean;
   created_at: Date;
+  profile?: any;
+  membership_info?: any;
+}
+
+export async function getUserById(id: string | number): Promise<User | null> {
+  const { pool } = await import('./db');
+  const connection = await pool.getConnection();
+  
+  try {
+    const [rows] = await connection.query<User[]>(
+      'SELECT * FROM users WHERE id = ?',
+      [typeof id === 'string' ? parseInt(id) : id]
+    );
+    
+    return rows.length > 0 ? rows[0] : null;
+  } catch (error) {
+    console.error('Error getting user by ID:', error);
+    throw error;
+  } finally {
+    connection.release();
+  }
 }

@@ -12,14 +12,20 @@ import {
   FiPlus,
   FiFile,
   FiImage,
+  FiSettings,
+  FiCheck,
+  FiX,
+  FiEye,
+  FiRefreshCw,
+  FiLayout,
+  FiMenu,
   FiVideo,
   FiFileText,
   FiGlobe,
-  FiSettings,
-  FiEye,
-  FiCheck,
-  FiX,
   FiCalendar,
+  FiHome,
+  FiInfo,
+  FiMail,
 } from 'react-icons/fi';
 
 interface ContentPage {
@@ -63,10 +69,12 @@ interface MediaFile {
 export default function AdminContentPage() {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'pages' | 'media' | 'settings'>('pages');
+  const [activeTab, setActiveTab] = useState<'pages' | 'media' | 'settings' | 'footer' | 'navigation' | 'home' | 'about' | 'contact'>('pages');
   const [pages, setPages] = useState<ContentPage[]>([]);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
-  const [siteSettings, setSiteSettings] = useState<SiteSetting[]>([]);
+  const [homeContent, setHomeContent] = useState<any>([]);
+  const [aboutContent, setAboutContent] = useState<any>([]);
+  const [contactContent, setContactContent] = useState<any>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -103,6 +111,21 @@ export default function AdminContentPage() {
         case 'settings':
           endpoint = '/api/admin/content/settings';
           break;
+        case 'home':
+          endpoint = '/api/admin/content/home';
+          break;
+        case 'about':
+          endpoint = '/api/admin/content/about';
+          break;
+        case 'contact':
+          endpoint = '/api/admin/content/contact';
+          break;
+        case 'footer':
+          endpoint = '/api/admin/content/footer';
+          break;
+        case 'navigation':
+          endpoint = '/api/admin/content/navigation';
+          break;
       }
 
       const response = await fetch(endpoint, { credentials: 'include' });
@@ -117,7 +140,22 @@ export default function AdminContentPage() {
           setMediaFiles(data);
           break;
         case 'settings':
-          setSiteSettings(data);
+          // Handle settings data
+          break;
+        case 'home':
+          setHomeContent(data);
+          break;
+        case 'about':
+          setAboutContent(data);
+          break;
+        case 'contact':
+          setContactContent(data);
+          break;
+        case 'footer':
+          // Handle footer data
+          break;
+        case 'navigation':
+          // Handle navigation data
           break;
       }
     } catch (error) {
@@ -136,8 +174,24 @@ export default function AdminContentPage() {
       
       if (activeTab === 'pages') {
         url = isEditing ? `/api/admin/content/pages/${selectedItem.id}` : '/api/admin/content/pages';
+        method = isEditing ? 'PUT' : 'POST';
+      } else if (activeTab === 'home') {
+        url = isEditing ? `/api/admin/content/home/${selectedItem.id}` : '/api/admin/content/home';
+        method = isEditing ? 'PUT' : 'POST';
+      } else if (activeTab === 'about') {
+        url = isEditing ? `/api/admin/content/about/${selectedItem.id}` : '/api/admin/content/about';
+        method = isEditing ? 'PUT' : 'POST';
+      } else if (activeTab === 'contact') {
+        url = isEditing ? `/api/admin/content/contact/${selectedItem.id}` : '/api/admin/content/contact';
+        method = isEditing ? 'PUT' : 'POST';
       } else if (activeTab === 'settings') {
-        url = `/api/admin/content/settings/${selectedItem.id}`;
+        url = '/api/admin/content/settings';
+        method = 'PUT';
+      } else if (activeTab === 'footer') {
+        url = '/api/admin/content/footer';
+        method = 'PUT';
+      } else if (activeTab === 'navigation') {
+        url = '/api/admin/content/navigation';
         method = 'PUT';
       }
 
@@ -167,6 +221,12 @@ export default function AdminContentPage() {
       let url = '';
       if (activeTab === 'pages') {
         url = `/api/admin/content/pages/${id}`;
+      } else if (activeTab === 'home') {
+        url = `/api/admin/content/home/${id}`;
+      } else if (activeTab === 'about') {
+        url = `/api/admin/content/about/${id}`;
+      } else if (activeTab === 'contact') {
+        url = `/api/admin/content/contact/${id}`;
       } else if (activeTab === 'media') {
         url = `/api/admin/content/media/${id}`;
       }
@@ -177,10 +237,14 @@ export default function AdminContentPage() {
       });
       if (!response.ok) throw new Error('Failed to delete item');
 
-      if (activeTab === 'pages') {
-        setPages(pages.filter(p => p.id !== id));
+      if (activeTab === 'home') {
+        setHomeContent(homeContent.filter((item: any) => item.id !== id));
+      } else if (activeTab === 'about') {
+        setAboutContent(aboutContent.filter((item: any) => item.id !== id));
+      } else if (activeTab === 'contact') {
+        setContactContent(contactContent.filter((item: any) => item.id !== id));
       } else if (activeTab === 'media') {
-        setMediaFiles(mediaFiles.filter(m => m.id !== id));
+        setMediaFiles(mediaFiles.filter((item: any) => item.id !== id));
       }
 
       toast.success('Item deleted successfully');
@@ -293,10 +357,15 @@ export default function AdminContentPage() {
   };
 
   const getFilteredData = () => {
-    let data = [];
-    if (activeTab === 'pages') data = pages;
-    else if (activeTab === 'media') data = mediaFiles;
-    else if (activeTab === 'settings') data = siteSettings;
+    let data: any[] = [];
+    if (activeTab === 'pages') data = Array.isArray(pages) ? pages : [];
+    else if (activeTab === 'media') data = Array.isArray(mediaFiles) ? mediaFiles : [];
+    else if (activeTab === 'home') data = Array.isArray(homeContent) ? homeContent : [];
+    else if (activeTab === 'about') data = Array.isArray(aboutContent) ? aboutContent : [];
+    else if (activeTab === 'contact') data = Array.isArray(contactContent) ? contactContent : [];
+    else if (activeTab === 'settings') data = [];
+    else if (activeTab === 'footer') data = [];
+    else if (activeTab === 'navigation') data = [];
 
     return data.filter(item =>
       Object.values(item).some(value =>
@@ -351,6 +420,11 @@ export default function AdminContentPage() {
             { key: 'pages', label: 'Pages', icon: FiFile },
             { key: 'media', label: 'Media Library', icon: FiImage },
             { key: 'settings', label: 'Site Settings', icon: FiSettings },
+            { key: 'home', label: 'Home', icon: FiHome },
+            { key: 'about', label: 'About', icon: FiInfo },
+            { key: 'contact', label: 'Contact', icon: FiMail },
+            { key: 'footer', label: 'Footer', icon: FiLayout },
+            { key: 'navigation', label: 'Navigation', icon: FiMenu },
           ].map((tab) => {
             const Icon = tab.icon;
             return (
@@ -399,15 +473,33 @@ export default function AdminContentPage() {
                 />
               </label>
             )}
-            {activeTab === 'pages' && (
-              <button
-                onClick={() => openModal()}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-              >
-                <FiPlus className="mr-2 h-4 w-4" />
-                Add Page
-              </button>
-            )}
+            {activeTab === 'home' && (
+          <button
+            onClick={() => openModal()}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+          >
+            <FiPlus className="mr-2 h-4 w-4" />
+            Add Content
+          </button>
+        )}
+        {activeTab === 'about' && (
+          <button
+            onClick={() => openModal()}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+          >
+            <FiPlus className="mr-2 h-4 w-4" />
+            Add Content
+          </button>
+        )}
+        {activeTab === 'contact' && (
+          <button
+            onClick={() => openModal()}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+          >
+            <FiPlus className="mr-2 h-4 w-4" />
+            Add Content
+          </button>
+        )}
           </div>
         </div>
         {isUploading && (
@@ -643,27 +735,32 @@ export default function AdminContentPage() {
                     </td>
                   </tr>
                 ) : (
-                  getFilteredData().map((setting: SiteSetting) => (
-                    <tr key={setting.id} className="hover:bg-gray-50">
+                  getFilteredData().map((item: any) => (
+                    <tr key={item.key || item.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{setting.key}</div>
+                        <div className="text-sm font-medium text-gray-900">{item.key || item.id}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <code className="bg-gray-100 px-2 py-1 rounded text-xs">
-                          {setting.value.length > 50 ? setting.value.substring(0, 50) + '...' : setting.value}
+                          {typeof item.value === 'object' 
+                            ? JSON.stringify(item.value).substring(0, 50) + '...'
+                            : String(item.value).length > 50 
+                              ? String(item.value).substring(0, 50) + '...'
+                              : String(item.value)
+                          }
                         </code>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {setting.category}
+                          {item.category || 'general'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {setting.description}
+                        {item.description || 'No description'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
-                          onClick={() => openModal(setting)}
+                          onClick={() => openModal(item)}
                           className="text-blue-600 hover:text-blue-900"
                           title="Edit Setting"
                         >
@@ -675,6 +772,156 @@ export default function AdminContentPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {activeTab === 'home' && (
+          <div className="p-6">
+            <div className="space-y-6">
+              <h3 className="text-lg font-medium text-gray-900">Home Content</h3>
+              {homeContent.length > 0 ? (
+                <div className="space-y-4">
+                  {homeContent.map((item: any) => (
+                    <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{item.section_key}</h4>
+                        <p className="text-sm text-gray-600">{item.content}</p>
+                        <span className="text-xs text-gray-500">{item.section_type}</span>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => openModal(item)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Edit Content"
+                        >
+                          <FiEdit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete Content"
+                        >
+                          <FiTrash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <FiHome className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No home content</h3>
+                  <p className="text-gray-500 mb-4">Configure your home page content</p>
+                  <button
+                    onClick={() => openModal()}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+                  >
+                    <FiPlus className="mr-2 h-4 w-4" />
+                    Add Content
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'about' && (
+          <div className="p-6">
+            <div className="space-y-6">
+              <h3 className="text-lg font-medium text-gray-900">About Content</h3>
+              {aboutContent.length > 0 ? (
+                <div className="space-y-4">
+                  {aboutContent.map((item: any) => (
+                    <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{item.section_key}</h4>
+                        <p className="text-sm text-gray-600">{item.content}</p>
+                        <span className="text-xs text-gray-500">{item.section_type}</span>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => openModal(item)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Edit Content"
+                        >
+                          <FiEdit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete Content"
+                        >
+                          <FiTrash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <FiInfo className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No about content</h3>
+                  <p className="text-gray-500 mb-4">Configure your about page content</p>
+                  <button
+                    onClick={() => openModal()}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+                  >
+                    <FiPlus className="mr-2 h-4 w-4" />
+                    Add Content
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'contact' && (
+          <div className="p-6">
+            <div className="space-y-6">
+              <h3 className="text-lg font-medium text-gray-900">Contact Content</h3>
+              {contactContent.length > 0 ? (
+                <div className="space-y-4">
+                  {contactContent.map((item: any) => (
+                    <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{item.section_key}</h4>
+                        <p className="text-sm text-gray-600">{item.content}</p>
+                        <span className="text-xs text-gray-500">{item.section_type}</span>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => openModal(item)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Edit Content"
+                        >
+                          <FiEdit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete Content"
+                        >
+                          <FiTrash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <FiMail className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No contact content</h3>
+                  <p className="text-gray-500 mb-4">Configure your contact page content</p>
+                  <button
+                    onClick={() => openModal()}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+                  >
+                    <FiPlus className="mr-2 h-4 w-4" />
+                    Add Content
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -709,10 +956,10 @@ export default function AdminContentPage() {
                         </label>
                         <input
                           type="text"
-                          required
                           value={formData.title || ''}
                           onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                          required
                         />
                       </div>
                       <div>
@@ -721,51 +968,37 @@ export default function AdminContentPage() {
                         </label>
                         <input
                           type="text"
-                          required
                           value={formData.slug || ''}
                           onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                          required
                         />
                       </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Excerpt
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={formData.excerpt || ''}
-                        onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Content
                       </label>
                       <textarea
-                        rows={10}
-                        required
                         value={formData.content || ''}
                         onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                        rows={6}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Excerpt
+                      </label>
+                      <textarea
+                        value={formData.excerpt || ''}
+                        onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
+                        rows={3}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
                       />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Type
-                        </label>
-                        <select
-                          value={formData.type || 'page'}
-                          onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                        >
-                          <option value="page">Page</option>
-                          <option value="post">Post</option>
-                          <option value="announcement">Announcement</option>
-                        </select>
-                      </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Status
@@ -780,60 +1013,116 @@ export default function AdminContentPage() {
                           <option value="archived">Archived</option>
                         </select>
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Type
+                        </label>
+                        <select
+                          value={formData.type || 'page'}
+                          onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                        >
+                          <option value="page">Page</option>
+                          <option value="post">Post</option>
+                          <option value="announcement">Announcement</option>
+                        </select>
+                      </div>
                     </div>
                   </>
                 )}
 
-                {activeTab === 'settings' && (
+                {(activeTab === 'home' || activeTab === 'about' || activeTab === 'contact') && (
                   <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Setting Key
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.key || ''}
-                        disabled
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Value
-                      </label>
-                      {formData.type === 'html' ? (
-                        <textarea
-                          rows={6}
-                          required
-                          value={formData.value || ''}
-                          onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500 font-mono text-sm"
-                        />
-                      ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Section Key
+                        </label>
                         <input
                           type="text"
-                          required
-                          value={formData.value || ''}
-                          onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                          value={formData.section_key || ''}
+                          onChange={(e) => setFormData({ ...formData, section_key: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                          required
                         />
-                      )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Section Type
+                        </label>
+                        <select
+                          value={formData.section_type || ''}
+                          onChange={(e) => setFormData({ ...formData, section_type: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                          required
+                        >
+                          <option value="">Select type</option>
+                          <option value="heading">Heading</option>
+                          <option value="subheading">Subheading</option>
+                          <option value="text">Text</option>
+                          <option value="list_item">List Item</option>
+                          <option value="image">Image</option>
+                          {activeTab === 'about' && (
+                            <>
+                              <option value="mission">Mission</option>
+                              <option value="vision">Vision</option>
+                              <option value="values">Values</option>
+                            </>
+                          )}
+                          {activeTab === 'contact' && (
+                            <>
+                              <option value="email">Email</option>
+                              <option value="phone">Phone</option>
+                              <option value="address">Address</option>
+                              <option value="map_url">Map URL</option>
+                              <option value="social_link">Social Link</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
                     </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Description
+                        Content
                       </label>
                       <textarea
-                        rows={3}
-                        value={formData.description || ''}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        value={formData.content || ''}
+                        onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                        rows={4}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                        required
                       />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Order Index
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.order_index || 0}
+                          onChange={(e) => setFormData({ ...formData, order_index: parseInt(e.target.value) })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={formData.is_active !== false}
+                            onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                            className="rounded border-gray-300 text-green-600 focus:ring-green-500 mr-2"
+                          />
+                          <span className="text-sm font-medium text-gray-700">Active</span>
+                        </label>
+                      </div>
                     </div>
                   </>
                 )}
 
-                <div className="flex justify-end space-x-3 pt-4 border-t">
+                <div className="flex justify-end space-x-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -846,7 +1135,7 @@ export default function AdminContentPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    className="px-4 py-2 border border-transparent rounded-md text-white bg-green-600 hover:bg-green-700"
                   >
                     {isEditing ? 'Update' : 'Create'}
                   </button>

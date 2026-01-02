@@ -1,0 +1,194 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { FiMail, FiPhone, FiMapPin, FiSend } from 'react-icons/fi';
+
+interface ContactContent {
+  id: number;
+  section_key: string;
+  section_type: 'heading' | 'text' | 'email' | 'phone' | 'address' | 'map_url' | 'social_link';
+  content: string;
+  order_index: number;
+  is_active: boolean;
+}
+
+export default function ContactPage() {
+  const [contactContent, setContactContent] = useState<ContactContent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchContactContent();
+  }, []);
+
+  const fetchContactContent = async () => {
+    try {
+      const response = await fetch('/api/contact-content');
+      if (response.ok) {
+        const data = await response.json();
+        setContactContent(data);
+      }
+    } catch (error) {
+      console.error('Error fetching contact content:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fallback static content
+  const staticContent = {
+    mainHeading: "Contact Us",
+    description: "Get in touch with us for any inquiries about membership, services, or partnerships.",
+    email: "info@tla.or.tz",
+    phone: "+255 22 211 1234",
+    address: "Dar es Salaam, Tanzania"
+  };
+
+  // Use database content if available, otherwise use static content
+  const mainHeading = contactContent.find(item => item.section_key === 'contact_main_heading')?.content || staticContent.mainHeading;
+  const description = contactContent.find(item => item.section_key === 'contact_description')?.content || staticContent.description;
+  const email = contactContent.find(item => item.section_key === 'contact_email')?.content || staticContent.email;
+  const phone = contactContent.find(item => item.section_key === 'contact_phone')?.content || staticContent.phone;
+  const address = contactContent.find(item => item.section_key === 'contact_address')?.content || staticContent.address;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header Section */}
+      <section className="bg-gradient-to-r from-green-600 to-green-700 text-white py-20">
+        <div className="container mx-auto px-4">
+          <div className="text-center">
+            <h1 className="text-5xl font-bold mb-6">{mainHeading}</h1>
+            <p className="text-xl mb-8 text-green-100 max-w-3xl mx-auto">{description}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Contact Information Section */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-shadow text-center">
+              <div className="bg-green-100 p-4 rounded-full inline-block mb-4">
+                <FiMail className="h-6 w-6 text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Email</h3>
+              <p className="text-gray-600">{email}</p>
+            </div>
+            
+            <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-shadow text-center">
+              <div className="bg-green-100 p-4 rounded-full inline-block mb-4">
+                <FiPhone className="h-6 w-6 text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Phone</h3>
+              <p className="text-gray-600">{phone}</p>
+            </div>
+            
+            <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-shadow text-center">
+              <div className="bg-green-100 p-4 rounded-full inline-block mb-4">
+                <FiMapPin className="h-6 w-6 text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Address</h3>
+              <p className="text-gray-600">{address}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Contact Form Section */}
+      <section className="py-20 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
+              Send Us a Message
+            </h2>
+            
+            <form className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                    placeholder="Your Name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                    placeholder="your@email.com"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Subject
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                  placeholder="How can we help?"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Message
+                </label>
+                <textarea
+                  rows={6}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                  placeholder="Tell us more about your inquiry..."
+                />
+              </div>
+              
+              <div className="text-center">
+                <button
+                  type="submit"
+                  className="bg-green-600 text-white px-8 py-4 rounded-lg font-semibold hover:bg-green-700 transition-colors inline-flex items-center"
+                >
+                  <FiSend className="mr-2 h-5 w-5" />
+                  Send Message
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      {/* Map Section */}
+      <section className="py-20 bg-gray-100">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Find Us</h2>
+            <div className="w-24 h-1 bg-green-600 mx-auto"></div>
+          </div>
+          
+          <div className="max-w-5xl mx-auto">
+            <div className="bg-white p-8 rounded-xl shadow-lg">
+              <div className="aspect-w-16 aspect-h-9 bg-gray-200 rounded-lg flex items-center justify-center">
+                <div className="text-center">
+                  <FiMapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">Map will be displayed here</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

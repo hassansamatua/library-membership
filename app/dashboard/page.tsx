@@ -40,23 +40,40 @@ type MembershipStatusResponse = {
 const calculateProfileCompletion = (user: any) => {
   if (!user) return 0;
   
-  const profile = user.profile || {};
+  console.log('📊 Dashboard Page - Calculating completion for user:', user.name, 'ID:', user.id);
+  
   let completedFields = 0;
   const totalFields = 10; // Total number of important fields
   
-  // Check personal info
-  if (profile.personalInfo?.fullName) completedFields++;
-  if (profile.personalInfo?.dateOfBirth) completedFields++;
-  if (profile.contactInfo?.phone) completedFields++;
-  if (profile.contactInfo?.address) completedFields++;
-  if (profile.professionalInfo?.occupation) completedFields++;
-  if (profile.education?.length > 0) completedFields++;
-  if (profile.membership?.membershipType) completedFields++;
-  if (profile.payment?.paymentMethod) completedFields++;
-  if (profile.participation?.areasOfInterest?.length > 0) completedFields++;
-  if (profile.documents?.idProof) completedFields++;
+  // Check personal info (using flat structure)
+  if (user.name) { completedFields++; console.log('✓ Name'); }
+  if (user.date_of_birth) { completedFields++; console.log('✓ Date of Birth'); }
+  if (user.phone) { completedFields++; console.log('✓ Phone'); }
+  if (user.address) { completedFields++; console.log('✓ Address'); }
+  if (user.employment) {
+    try {
+      const employment = JSON.parse(user.employment || '{}');
+      if (employment.occupation) { completedFields++; console.log('✓ Occupation'); }
+    } catch (e) {
+      console.log('❌ Failed to parse employment');
+    }
+  }
+  if (user.education) {
+    try {
+      const education = JSON.parse(user.education || '[]');
+      if (education.length > 0) { completedFields++; console.log('✓ Education'); }
+    } catch (e) {
+      console.log('❌ Failed to parse education');
+    }
+  }
+  if (user.membership_status) { completedFields++; console.log('✓ Membership Status'); }
+  if (user.profile_picture) { completedFields++; console.log('✓ Profile Picture'); }
+  if (user.id_proof_path) { completedFields++; console.log('✓ ID Proof'); }
   
-  return Math.round((completedFields / totalFields) * 100);
+  const percentage = Math.round((completedFields / totalFields) * 100);
+  console.log(`📈 Dashboard Page - Completed: ${completedFields}/${totalFields} = ${percentage}%`);
+  
+  return percentage;
 };
 
 export default function DashboardPage() {
@@ -67,10 +84,32 @@ export default function DashboardPage() {
   const [isMembershipLoading, setIsMembershipLoading] = useState(false);
 
   useEffect(() => {
+    const testDirectAPI = async () => {
+      try {
+        console.log('🔍 Testing direct /api/auth/me call...');
+        const response = await fetch('/api/auth/me', { credentials: 'include' });
+        if (response.ok) {
+          const data = await response.json();
+          console.log('🔍 Direct API result:', data);
+          console.log('🔍 Direct API membershipNumber:', data.membershipNumber);
+        } else {
+          console.log('🔍 Direct API failed:', response.status);
+        }
+      } catch (error) {
+        console.error('🔍 Direct API error:', error);
+      }
+    };
+    
+    if (isAuthenticated) {
+      testDirectAPI();
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/auth/login');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated]);
 
   useEffect(() => {
     if (user) {
@@ -213,7 +252,10 @@ export default function DashboardPage() {
                   <div className="bg-gray-50 rounded-md p-4">
                     <div className="text-xs text-gray-500">Membership #</div>
                     <div className="text-lg font-semibold text-gray-900">
-                      {membershipStatus.membership?.membershipNumber || user?.membershipNumber || 'N/A'}
+                      {(() => {
+                        const displayNumber = membershipStatus.membership?.membershipNumber || user?.membershipNumber || 'N/A';
+                        return displayNumber;
+                      })()}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">Expiry: {membershipStatus.membership?.expiryDate || membershipStatus.cycle?.expiryDate}</div>
                   </div>

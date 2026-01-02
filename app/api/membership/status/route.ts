@@ -110,7 +110,16 @@ export async function GET(request: Request) {
     const membershipExpiry = membership?.expiry_date ? new Date(membership.expiry_date) : null;
     const activeByDate = membershipExpiry ? membershipExpiry.getTime() >= nowDateOnly.getTime() : false;
     const paid = membership?.payment_status === 'paid';
-    const active = Boolean(membership?.status === 'active' && activeByDate && paid);
+    // Check if user has profile picture
+    const [profileRows] = await connection.query<RowDataPacket[]>(
+      'SELECT profile_picture FROM user_profiles WHERE user_id = ?',
+      [decoded.id]
+    );
+    
+    const userProfile = profileRows[0] || {};
+    const hasProfilePicture = Boolean(userProfile.profile_picture && userProfile.profile_picture !== '' && userProfile.profile_picture !== null);
+
+    const active = Boolean(membership?.status === 'active' && activeByDate && paid && hasProfilePicture);
 
     const effectiveFees = active
       ? { baseAmount: 0, penaltyAmount: 0, totalDue: 0, currency: 'TZS' }

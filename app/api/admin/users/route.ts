@@ -81,7 +81,16 @@ export async function GET(request: Request) {
     
     query += ' ORDER BY u.created_at DESC';
     
+    console.log('Users query:', query);
+    console.log('Query params:', params);
+    
     const [users] = await connection.query<RowDataPacket[]>(query, params);
+    
+    console.log('Users fetched:', users.length);
+    console.log('Approval status breakdown:');
+    users.forEach((user: any, index: number) => {
+      console.log(`  User ${index + 1}: ${user.name} - is_approved: ${user.is_approved}, is_admin: ${user.is_admin}`);
+    });
     
     // Transform the data to include profile information
     const transformedUsers = users.map(user => ({

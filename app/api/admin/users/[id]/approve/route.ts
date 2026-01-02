@@ -110,10 +110,30 @@ async function handleApproveUser(request: Request, userId: string) {
         });
       }
 
+      // Generate membership number if not exists
+      let membershipNumber = user.membership_number;
+      if (!membershipNumber) {
+        const year = new Date().getFullYear().toString().slice(-2); // Get last 2 digits
+        const randomNum = Math.floor(10000 + Math.random() * 90000); // 5-digit random number
+        membershipNumber = `TLA${year}${randomNum}`;
+        
+        // Store membership number in database
+        await connection.query(
+          'UPDATE user_profiles SET membership_number = ?, updated_at = NOW() WHERE user_id = ?',
+          [membershipNumber, userId]
+        );
+      }
+
       // Update user approval status
       const [result] = await connection.query<ResultSetHeader>(
         'UPDATE users SET is_approved = TRUE, updated_at = NOW() WHERE id = ?',
         [userId]
+      );
+
+      // Also update membership status to 'active' in user_profiles
+      await connection.query(
+        'UPDATE user_profiles SET membership_status = ?, updated_at = NOW() WHERE user_id = ?',
+        ['active', userId]
       );
 
       // Get updated user data

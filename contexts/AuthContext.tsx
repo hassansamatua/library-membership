@@ -156,7 +156,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const meRes = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
         if (meRes.ok) {
           const me = await meRes.json();
-          setUser({
+          console.log('🔍 AuthContext - Received from /api/auth/me:', me);
+          console.log('🔍 AuthContext - me.membershipNumber:', me.membershipNumber);
+          const updatedUser = {
             id: me.id,
             name: me.name || '',
             email: me.email,
@@ -164,7 +166,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isApproved: toBoolean(me.isApproved),
             membershipNumber: me.membershipNumber ?? null,
             profile: me.profile || undefined
-          });
+          };
+          console.log('🔍 AuthContext - Setting user with membershipNumber:', updatedUser.membershipNumber);
+          setUser(updatedUser);
           return { user: {
             id: me.id,
             name: me.name || '',
@@ -276,36 +280,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const checkAuth = async () => {
         console.log('[AuthContext] Checking authentication status...');
-        const response = await fetch('/api/auth/me', { 
-          credentials: 'include',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          },
-          cache: 'no-store'
-        });
+        try {
+          const response = await fetch('/api/auth/me', { 
+            credentials: 'include',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            },
+            cache: 'no-store'
+          });
 
-        console.log('[AuthContext] Auth check response status:', response.status);
+          console.log('[AuthContext] Auth check response status:', response.status);
 
-        if (response.ok) {
-          const userData = await response.json();
-          console.log('[AuthContext] Raw user data from /api/auth/me:', userData);
-          
-          // Simplified user data for testing
-          const normalizedUser = {
-            id: userData.id,
-            name: userData.name || userData.username || '',
-            email: userData.email,
-            isAdmin: userData.isAdmin || userData.is_admin || false,
-            isApproved: userData.isAdmin ? true : (userData.isApproved || userData.is_approved || false),
-            membershipNumber: userData.membershipNumber ?? null,
-            profile: userData.profile || undefined
-          };
-          
-          console.log('[AuthContext] Setting user state:', normalizedUser);
-          setUser(normalizedUser);
-        } else {
-          console.log('[AuthContext] No active session found');
+          if (response.ok) {
+            const userData = await response.json();
+            console.log('[AuthContext] Raw user data from /api/auth/me:', userData);
+            
+            // Simplified user data for testing
+            const normalizedUser = {
+              id: userData.id,
+              name: userData.name || userData.username || '',
+              email: userData.email,
+              isAdmin: userData.isAdmin || userData.is_admin || false,
+              isApproved: userData.isAdmin ? true : (userData.isApproved || userData.is_approved || false),
+              membershipNumber: userData.membershipNumber ?? null,
+              profile: userData.profile || undefined
+            };
+            
+            console.log('[AuthContext] Setting user state:', normalizedUser);
+            setUser(normalizedUser);
+          } else {
+            console.log('[AuthContext] No active session found, status:', response.status);
+            const errorData = await response.text();
+            console.log('[AuthContext] Error response:', errorData);
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('[AuthContext] Error in checkAuth:', error);
           setUser(null);
         }
         
@@ -315,7 +326,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       checkAuth();
       console.log('[AuthContext] checkAuth called successfully');
     } catch (error) {
-      console.error('[AuthContext] Error in checkAuth:', error);
+      console.error('[AuthContext] Error in useEffect:', error);
       setIsLoading(false);
     }
   }, []);

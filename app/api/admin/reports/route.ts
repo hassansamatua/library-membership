@@ -1,15 +1,80 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
- import { cookies } from 'next/headers';
- import { verifyToken } from '@/lib/auth';
+import { RowDataPacket } from 'mysql2/promise';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
+
+async function getAuthToken(request: Request) {
+  const authHeader = request.headers.get('authorization');
+  const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+  if (authToken) return authToken;
+
+  const cookieStore = await cookies();
+  return cookieStore.get('token')?.value || null;
+}
+
+export async function GET(request: Request) {
+  let connection;
+  try {
+    const token = await getAuthToken(request);
+
+    if (!token) {
+      return NextResponse.json(
+        { message: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    let decoded;
+    try {
+      decoded = verifyToken(token);
+    } catch {
+      return NextResponse.json(
+        { message: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    if (!decoded?.isAdmin) {
+      return NextResponse.json(
+        { message: 'Admin access required' },
+        { status: 403 }
+      );
+    }
+
+    connection = await pool.getConnection();
+
+    // Get saved reports from database (if you have a reports table)
+    // For now, return empty array since we don't have a reports table
+    const [rows] = await connection.query<RowDataPacket[]>(
+      `SELECT 
+        id,
+        name,
+        type,
+        parameters,
+        generated_at as generatedAt,
+        generated_by as generatedBy,
+        file_path as filePath
+      FROM reports 
+      ORDER BY generated_at DESC`
+    ).catch(() => [[], []]);
+
+    return NextResponse.json(rows);
+  } catch (error) {
+    console.error('Error fetching reports:', error);
+    return NextResponse.json(
+      { message: 'Failed to fetch reports' },
+      { status: 500 }
+    );
+  } finally {
+    if (connection) connection.release();
+  }
+}
 
 export async function POST(request: Request) {
+  let connection;
   try {
-    const authHeader = request.headers.get('authorization');
-    const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-    const cookieStore = await cookies();
-    const cookieToken = cookieStore.get('token')?.value;
-    const token = authToken || cookieToken;
+    const token = await getAuthToken(request);
 
     if (!token) {
       return NextResponse.json(
@@ -96,7 +161,8 @@ export async function POST(request: Request) {
         );
     }
 
-    const [results] = await pool.query(query, params);
+    connection = await pool.getConnection();
+    const [results] = await connection.query(query, params);
     
     return NextResponse.json({
       success: true,
@@ -116,5 +182,7 @@ export async function POST(request: Request) {
       },
       { status: 500 }
     );
+  } finally {
+    if (connection) connection.release();
   }
 }

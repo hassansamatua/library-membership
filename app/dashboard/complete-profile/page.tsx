@@ -16,7 +16,6 @@ type ProfileData = {
     idNumber: string;
   };
   contactInfo: {
-    socialMedia: any;
     email: string;
     phone: string;
     address: string;
@@ -86,12 +85,11 @@ export default function CompleteProfilePage() {
       idNumber: ''
     },
     contactInfo: {
-      socialMedia: {},
       email: user?.email || '',
       phone: '',
       address: '',
-      city: 'Dar es Salaam',
-      country: 'Tanzania',
+      city: '',
+      country: '',
       postalCode: ''
     },
     professionalInfo: {
@@ -166,7 +164,6 @@ export default function CompleteProfilePage() {
         },
         contactInfo: {
           ...prev.contactInfo,
-          socialMedia: profile.contactInfo?.socialMedia || '',
           email: profile.contactInfo?.email || userData.email || '',
           phone: profile.contactInfo?.phone || '',
           address: profile.contactInfo?.address || '',
@@ -303,7 +300,6 @@ export default function CompleteProfilePage() {
       }));
 
       formDataToSend.append('contactInfo', JSON.stringify({
-        socialMedia: formData.contactInfo.socialMedia,
         email: formData.contactInfo.email,
         phone: formData.contactInfo.phone,
         address: formData.contactInfo.address,
@@ -642,31 +638,6 @@ export default function CompleteProfilePage() {
                     value={formData.contactInfo.postalCode}
                     onChange={(e) => handleInputChange('contactInfo', 'postalCode', e.target.value)}
                   />
-                </div>
-              </div>
-              {/* Social Media */}
-              <div className="sm:col-span-6">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Social Media</h4>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div>
-                    <label htmlFor="facebook" className="block text-xs font-medium text-gray-500">
-                      Facebook
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        type="url"
-                        id="facebook"
-                        name="facebook"
-                        className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                        value={formData.contactInfo.socialMedia?.facebook || ''}
-                        onChange={(e) => handleInputChange('contactInfo', 'socialMedia', {
-                          ...formData.contactInfo.socialMedia,
-                          facebook: e.target.value
-                        })}
-                      />
-                    </div>
-                  </div>
-                  {/* Add Twitter and LinkedIn similarly */}
                 </div>
               </div>
             </div>

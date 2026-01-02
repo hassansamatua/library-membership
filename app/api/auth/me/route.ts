@@ -162,8 +162,8 @@ export async function GET(request: Request) {
       console.log('[Auth/me] Profile query failed:', profileError);
     }
     
-    // Combine user and profile data
-    const combinedUser = { ...userOnly, ...profileData };
+    // Combine user and profile data, but prioritize users table for membership_number
+    const combinedUser = { ...profileData, ...userOnly };
     console.log('[Auth/me] Combined user data:', combinedUser);
 
     delete combinedUser.password;

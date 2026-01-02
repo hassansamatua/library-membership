@@ -18,6 +18,8 @@ import {
   FiTrendingUp,
   FiEye,
   FiRefreshCw,
+  FiX,
+  FiTrash2,
 } from 'react-icons/fi';
 
 interface Report {
@@ -138,11 +140,10 @@ export default function AdminReportsPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          type: selectedTemplate.type,
-          format: generateForm.format,
-          dateFrom: generateForm.dateFrom,
-          dateTo: generateForm.dateTo,
-          filters: generateForm.filters,
+          reportType: selectedTemplate.type,
+          startDate: generateForm.dateFrom,
+          endDate: generateForm.dateTo,
+          columns: generateForm.filters,
         }),
       });
 

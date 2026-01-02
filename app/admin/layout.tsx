@@ -16,6 +16,9 @@ import {
   FiX,
   FiLogOut,
   FiHome,
+  FiAward,
+  FiFile,
+  FiExternalLink,
 } from 'react-icons/fi';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -60,15 +63,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [mounted, isAuthLoading, isAuthenticated, user, router]);
 
   const menuItems = [
-    { href: '/admin', label: 'Dashboard', icon: FiHome },
-    { href: '/admin/users', label: 'User Management', icon: FiUsers },
-    { href: '/admin/requests', label: 'New User Requests', icon: FiUserPlus },
-    { href: '/admin/events', label: 'Events', icon: FiCalendar },
-    { href: '/admin/payments', label: 'Payments', icon: FiCreditCard },
-    { href: '/admin/reports', label: 'Reports', icon: FiBarChart2 },
-    { href: '/admin/membership', label: 'Membership', icon: FiSettings },
-    { href: '/admin/content', label: 'Content Management', icon: FiFileText },
-  ];
+    { name: 'Dashboard', href: '/admin', icon: FiHome },
+    { name: 'User Management', href: '/admin/users', icon: FiUsers },
+    { name: 'Membership', href: '/admin/membership', icon: FiAward },
+    { name: 'Content Management', href: '/admin/content', icon: FiFile },
+    { name: 'Events', href: '/admin/events', icon: FiCalendar },
+    { name: 'Reports', href: '/admin/reports', icon: FiBarChart2 },
+    { name: 'View Site', href: '/', icon: FiExternalLink, external: true },
+  ].map((item) => ({ ...item, label: item.name }));
 
   const handleLogout = async () => {
     try {
@@ -108,7 +110,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <nav className="mt-8">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || (item.href === '/admin' && pathname === '/admin/users');
+            const isActive = pathname === item.href;
             
             return (
               <Link
@@ -120,6 +122,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
                 onClick={() => setSidebarOpen(false)}
+                target={item.external ? '_blank' : '_self'}
+                rel={item.external ? 'noopener noreferrer' : ''}
               >
                 <Icon className="mr-3 h-5 w-5" />
                 {item.label}
