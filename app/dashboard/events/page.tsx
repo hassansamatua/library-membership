@@ -1,22 +1,23 @@
 "use client";
 
+// Force re-render - updated
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { FiCalendar, FiMapPin, FiUsers, FiClock, FiArrowLeft, FiPlus, FiEdit, FiTrash2, FiEye } from 'react-icons/fi';
+import { FiCalendar, FiMapPin, FiUsers, FiClock, FiArrowLeft, FiPlus, FiEdit, FiTrash2, FiEye, FiUsers as FiUserList } from 'react-icons/fi';
 
 interface Event {
   id: number;
   title: string;
   description: string;
-  date: string;
-  time: string;
+  start_time: string;
+  end_time: string;
   location: string;
-  max_attendees: number;
+  capacity: number;
   current_attendees: number;
-  price: number;
-  is_free: boolean;
-  image_url?: string;
+  user_registered: number;
+  status: string;
+  created_by: number;
   created_at: string;
   updated_at: string;
 }
@@ -83,11 +84,15 @@ export default function EventsPage() {
   };
 
   const isUpcoming = (event: Event) => {
-    return new Date(event.date) > new Date();
+    return new Date(event.start_time) > new Date();
   };
 
   const isFullyBooked = (event: Event) => {
-    return event.current_attendees >= event.max_attendees;
+    return event.current_attendees >= event.capacity;
+  };
+
+  const isUserRegistered = (event: Event) => {
+    return event.user_registered > 0;
   };
 
   if (!user) {
@@ -121,13 +126,13 @@ export default function EventsPage() {
           
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">TLA Events</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">TLA Events - UPDATED</h1>
               <p className="text-gray-600">
                 Upcoming conferences, workshops, and networking events
               </p>
             </div>
             
-            {user?.is_admin && (
+            {user?.isAdmin && (
               <button
                 onClick={() => router.push('/dashboard/events/create')}
                 className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
@@ -153,20 +158,10 @@ export default function EventsPage() {
                 key={event.id}
                 className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
               >
-                {/* Event Image */}
-                {event.image_url ? (
-                  <div className="h-48 bg-gray-200">
-                    <img
-                      src={event.image_url}
-                      alt={event.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="h-48 bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center">
-                    <FiCalendar className="h-16 w-16 text-white" />
-                  </div>
-                )}
+                {/* Event Image - removed since no image_url field */}
+                <div className="h-48 bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center">
+                  <FiCalendar className="h-16 w-16 text-white" />
+                </div>
 
                 {/* Event Content */}
                 <div className="p-6">
@@ -190,11 +185,11 @@ export default function EventsPage() {
                   <div className="space-y-2 text-sm text-gray-600">
                     <div className="flex items-center">
                       <FiCalendar className="h-4 w-4 mr-2 text-gray-400" />
-                      {formatDate(event.date)}
+                      {formatDate(event.start_time)}
                     </div>
                     <div className="flex items-center">
                       <FiClock className="h-4 w-4 mr-2 text-gray-400" />
-                      {formatTime(event.time)}
+                      {formatTime(event.start_time)}
                     </div>
                     <div className="flex items-center">
                       <FiMapPin className="h-4 w-4 mr-2 text-gray-400" />
@@ -202,14 +197,14 @@ export default function EventsPage() {
                     </div>
                     <div className="flex items-center">
                       <FiUsers className="h-4 w-4 mr-2 text-gray-400" />
-                      {event.current_attendees} / {event.max_attendees} attendees
+                      {event.current_attendees} / {event.capacity} attendees
                     </div>
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-lg font-bold text-gray-900">
-                        {event.is_free ? 'Free' : `TZS ${event.price.toLocaleString()}`}
+                        Free Event
                       </span>
                       <div className="flex space-x-2">
                         <button
@@ -218,17 +213,26 @@ export default function EventsPage() {
                         >
                           <FiEye className="h-4 w-4" />
                         </button>
-                        {user?.is_admin && (
+                        {user?.isAdmin && (
                           <>
+                            <button
+                              onClick={() => router.push(`/dashboard/events/${event.id}/registrations`)}
+                              className="px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-xs"
+                              title="View Registrations"
+                            >
+                              Registrations
+                            </button>
                             <button
                               onClick={() => router.push(`/dashboard/events/${event.id}/edit`)}
                               className="text-green-600 hover:text-green-800"
+                              title="Edit Event"
                             >
                               <FiEdit className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => router.push(`/dashboard/events/${event.id}/delete`)}
                               className="text-red-600 hover:text-red-800"
+                              title="Delete Event"
                             >
                               <FiTrash2 className="h-4 w-4" />
                             </button>
@@ -237,7 +241,7 @@ export default function EventsPage() {
                       </div>
                     </div>
 
-                    {isUpcoming(event) && !isFullyBooked(event) && (
+                    {isUpcoming(event) && !isFullyBooked(event) && !isUserRegistered(event) && (
                       <button
                         onClick={() => {
                           setSelectedEvent(event);
@@ -246,6 +250,15 @@ export default function EventsPage() {
                         className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors"
                       >
                         Register Now
+                      </button>
+                    )}
+
+                    {isUserRegistered(event) && (
+                      <button
+                        disabled
+                        className="w-full bg-blue-300 text-blue-700 py-2 px-4 rounded-md cursor-not-allowed"
+                      >
+                        ✓ Registered
                       </button>
                     )}
 
@@ -258,7 +271,7 @@ export default function EventsPage() {
                       </button>
                     )}
 
-                    {isFullyBooked(event) && isUpcoming(event) && (
+                    {isFullyBooked(event) && isUpcoming(event) && !isUserRegistered(event) && (
                       <button
                         disabled
                         className="w-full bg-red-300 text-red-500 py-2 px-4 rounded-md cursor-not-allowed"
@@ -288,16 +301,7 @@ export default function EventsPage() {
                   </button>
                 </div>
 
-                {selectedEvent.image_url && (
-                  <div className="mb-4">
-                    <img
-                      src={selectedEvent.image_url}
-                      alt={selectedEvent.title}
-                      className="w-full h-64 object-cover rounded-lg"
-                    />
-                  </div>
-                )}
-
+                
                 <div className="space-y-4">
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-2">Description</h3>
@@ -307,8 +311,8 @@ export default function EventsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <h4 className="font-semibold text-gray-900 mb-1">Date & Time</h4>
-                      <p className="text-gray-600">{formatDate(selectedEvent.date)}</p>
-                      <p className="text-gray-600">{formatTime(selectedEvent.time)}</p>
+                      <p className="text-gray-600">{formatDate(selectedEvent.start_time)}</p>
+                      <p className="text-gray-600">{formatTime(selectedEvent.start_time)}</p>
                     </div>
                     <div>
                       <h4 className="font-semibold text-gray-900 mb-1">Location</h4>
@@ -318,15 +322,13 @@ export default function EventsPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-1">Price</h4>
-                      <p className="text-gray-600">
-                        {selectedEvent.is_free ? 'Free' : `TZS ${selectedEvent.price.toLocaleString()}`}
-                      </p>
+                      <h4 className="font-semibold text-gray-900 mb-1">Type</h4>
+                      <p className="text-gray-600">Free Event</p>
                     </div>
                     <div>
                       <h4 className="font-semibold text-gray-900 mb-1">Availability</h4>
                       <p className="text-gray-600">
-                        {selectedEvent.current_attendees} / {selectedEvent.max_attendees} spots
+                        {selectedEvent.current_attendees} / {selectedEvent.capacity} spots
                       </p>
                     </div>
                   </div>
@@ -362,15 +364,13 @@ export default function EventsPage() {
               <div className="mb-4">
                 <p className="text-gray-600 mb-2">You're registering for:</p>
                 <p className="font-medium text-gray-900">{selectedEvent.title}</p>
-                <p className="text-sm text-gray-600">{formatDate(selectedEvent.date)}</p>
+                <p className="text-sm text-gray-600">{formatDate(selectedEvent.start_time)}</p>
               </div>
 
               <div className="mb-4">
+                <p className="text-sm text-gray-600">Cost: Free</p>
                 <p className="text-sm text-gray-600">
-                  Cost: {selectedEvent.is_free ? 'Free' : `TZS ${selectedEvent.price.toLocaleString()}`}
-                </p>
-                <p className="text-sm text-gray-600">
-                  Available spots: {selectedEvent.max_attendees - selectedEvent.current_attendees}
+                  Available spots: {selectedEvent.capacity - selectedEvent.current_attendees}
                 </p>
               </div>
 

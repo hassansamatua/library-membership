@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
-import type { RowDataPacket } from 'mysql2';
+import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 interface Event {
   id: number;
@@ -34,9 +34,14 @@ export async function GET(request: NextRequest) {
     try {
       const [events] = await connection.query<RowDataPacket[]>(
         `SELECT e.*, 
-                (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = e.id) as current_attendees
+                (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = e.id) as current_attendees,
+                (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = e.id AND er.user_id = ?) as user_registered
          FROM events e
-         ORDER BY e.date ASC`
+         WHERE e.start_time >= NOW() 
+         AND e.status = 'upcoming'
+         AND (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = e.id) < e.capacity
+         ORDER BY e.start_time ASC`,
+        [userId]
       );
 
       return NextResponse.json({ events });
@@ -62,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     const connection = await pool.getConnection();
     try {
-      const [result] = await connection.query<RowDataPacket[]>(
+      const [result] = await connection.query<ResultSetHeader>(
         `INSERT INTO events (title, description, date, time, location, max_attendees, price, is_free, image_url, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [title, description, date, time, location, max_attendees, price, is_free, image_url]

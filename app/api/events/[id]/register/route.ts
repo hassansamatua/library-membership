@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
+import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const token = await getAuthToken(request);
     if (!token) {
@@ -12,12 +13,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const decoded = verifyToken(token);
     const userId = decoded.id;
-    const eventId = parseInt(params.id);
+    const { id: eventIdStr } = await params;
+    const eventId = parseInt(eventIdStr);
 
     const connection = await pool.getConnection();
     try {
       // Check if user is already registered
-      const [existingRegistration] = await connection.query(
+      const [existingRegistration] = await connection.query<RowDataPacket[]>(
         'SELECT id FROM event_registrations WHERE event_id = ? AND user_id = ?',
         [eventId, userId]
       );
@@ -27,8 +29,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       }
 
       // Check if event is fully booked
-      const [eventInfo] = await connection.query(
-        'SELECT max_attendees, (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = ?) as current_attendees FROM events WHERE id = ?',
+      const [eventInfo] = await connection.query<RowDataPacket[]>(
+        'SELECT capacity, (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = ?) as current_attendees FROM events WHERE id = ?',
         [eventId, eventId]
       );
 
@@ -37,7 +39,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       }
 
       const event = eventInfo[0];
-      if (event.current_attendees >= event.max_attendees) {
+      if (event.current_attendees >= event.capacity) {
         return NextResponse.json({ error: 'Event is fully booked' }, { status: 400 });
       }
 

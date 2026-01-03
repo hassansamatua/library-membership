@@ -59,6 +59,8 @@ export default function AdminReportsPage() {
     format: 'excel' as 'pdf' | 'excel' | 'csv',
     filters: {} as Record<string, any>,
   });
+  const [reportData, setReportData] = useState<any>(null);
+  const [showDataModal, setShowDataModal] = useState(false);
 
   const reportTemplates: ReportTemplate[] = [
     {
@@ -135,6 +137,7 @@ export default function AdminReportsPage() {
     if (!selectedTemplate) return;
 
     try {
+      setIsLoading(true);
       const response = await fetch('/api/admin/reports/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -150,7 +153,15 @@ export default function AdminReportsPage() {
       if (!response.ok) throw new Error('Failed to generate report');
 
       const data = await response.json();
-      toast.success('Report generated successfully');
+      
+      if (data.success && data.data) {
+        setReportData(data.data);
+        setShowDataModal(true);
+        toast.success('Report generated successfully');
+      } else {
+        throw new Error('No data returned');
+      }
+      
       setShowGenerateModal(false);
       setSelectedTemplate(null);
       setGenerateForm({
@@ -159,10 +170,11 @@ export default function AdminReportsPage() {
         format: 'excel',
         filters: {},
       });
-      fetchReports();
     } catch (error) {
       console.error('Error generating report:', error);
       toast.error('Failed to generate report');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -605,6 +617,132 @@ export default function AdminReportsPage() {
           </div>
         </div>
       )}
+
+      {/* Report Data Modal */}
+      {showDataModal && reportData && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {selectedTemplate?.name} - Results
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowDataModal(false);
+                    setReportData(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <FiX className="h-6 w-6" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mt-1">
+                {reportData.length} records found
+              </p>
+            </div>
+            
+            <div className="overflow-auto max-h-[70vh]">
+              {reportData.length === 0 ? (
+                <div className="text-center py-12">
+                  <FiFileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-gray-600">No data found for the selected criteria</p>
+                </div>
+              ) : (
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      {Object.keys(reportData[0] || {}).map((key) => (
+                        <th
+                          key={key}
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {reportData.map((row: any, index: number) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        {Object.values(row).map((value: any, cellIndex: number) => (
+                          <td key={cellIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {value === null ? 'N/A' : 
+                             typeof value === 'boolean' ? (value ? 'Yes' : 'No') :
+                             value instanceof Date ? value.toLocaleDateString() :
+                             String(value)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            
+            <div className="p-6 border-t border-gray-200">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-gray-600">
+                  Generated on {new Date().toLocaleString()}
+                </p>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      const csv = convertToCSV(reportData);
+                      downloadCSV(csv, `${selectedTemplate?.name || 'report'}.csv`);
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  >
+                    <FiDownload className="inline mr-2 h-4 w-4" />
+                    Download CSV
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDataModal(false);
+                      setReportData(null);
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function convertToCSV(data: any[]): string {
+  if (!data || data.length === 0) return '';
+  
+  const headers = Object.keys(data[0]);
+  const csvHeaders = headers.join(',');
+  
+  const csvRows = data.map(row => 
+    headers.map(header => {
+      const value = row[header];
+      if (value === null || value === undefined) return '';
+      if (typeof value === 'string' && value.includes(',')) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return String(value);
+    }).join(',')
+  );
+  
+  return [csvHeaders, ...csvRows].join('\n');
+}
+
+function downloadCSV(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  a.remove();
 }

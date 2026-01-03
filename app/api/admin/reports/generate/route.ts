@@ -53,11 +53,84 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    // Handle empty dates by setting a reasonable default range
+    let effectiveStartDate = startDate;
+    let effectiveEndDate = endDate;
+    
+    if (!startDate || !endDate) {
+      const now = new Date();
+      const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+      effectiveStartDate = oneYearAgo.toISOString().split('T')[0];
+      effectiveEndDate = now.toISOString().split('T')[0];
+    }
     
     let query = '';
     let params: any[] = [];
 
     switch (reportType) {
+      case 'users':
+        query = `
+          SELECT 
+            u.id,
+            u.name,
+            u.email,
+            u.is_approved,
+            u.created_at,
+            up.membership_number,
+            up.membership_type,
+            up.membership_status,
+            up.join_date,
+            m.expiry_date,
+            m.payment_status
+          FROM users u
+          LEFT JOIN user_profiles up ON u.id = up.user_id
+          LEFT JOIN memberships m ON u.id = m.user_id
+          WHERE u.created_at BETWEEN ? AND ?
+          ORDER BY u.created_at DESC
+        `;
+        params = [effectiveStartDate, effectiveEndDate];
+        break;
+
+      case 'activity':
+        query = `
+          SELECT 
+            'user_registration' as activity_type,
+            u.name COLLATE utf8mb4_unicode_ci as name,
+            u.email COLLATE utf8mb4_unicode_ci as email,
+            u.created_at as activity_date,
+            CONCAT('User registered: ', u.name) COLLATE utf8mb4_unicode_ci as description
+          FROM users u
+          WHERE u.created_at BETWEEN ? AND ?
+          
+          UNION ALL
+          
+          SELECT 
+            'event_created' as activity_type,
+            e.title COLLATE utf8mb4_unicode_ci as name,
+            '' COLLATE utf8mb4_unicode_ci as email,
+            e.created_at as activity_date,
+            CONCAT('Event created: ', e.title) COLLATE utf8mb4_unicode_ci as description
+          FROM events e
+          WHERE e.created_at BETWEEN ? AND ?
+          
+          UNION ALL
+          
+          SELECT 
+            'payment' as activity_type,
+            u.name COLLATE utf8mb4_unicode_ci as name,
+            u.email COLLATE utf8mb4_unicode_ci as email,
+            p.created_at as activity_date,
+            CONCAT('Payment: ', p.amount, ' via ', p.payment_method) COLLATE utf8mb4_unicode_ci as description
+          FROM payments p
+          LEFT JOIN users u ON p.user_id = u.id
+          WHERE p.created_at BETWEEN ? AND ?
+          
+          ORDER BY activity_date DESC
+        `;
+        params = [effectiveStartDate, effectiveEndDate, effectiveStartDate, effectiveEndDate, effectiveStartDate, effectiveEndDate];
+        break;
+
       case 'membership':
         query = `
           SELECT 
@@ -77,9 +150,10 @@ export async function POST(request: Request) {
           WHERE u.created_at BETWEEN ? AND ?
           ORDER BY u.created_at DESC
         `;
-        params = [startDate, endDate];
+        params = [effectiveStartDate, effectiveEndDate];
         break;
 
+      case 'payments':
       case 'financial':
         query = `
           SELECT 
@@ -91,9 +165,7 @@ export async function POST(request: Request) {
             p.amount,
             p.payment_method,
             p.status,
-            p.payment_date,
-            p.due_date,
-            p.invoice_number,
+            p.created_at as payment_date,
             p.description,
             p.created_at
           FROM payments p
@@ -101,7 +173,30 @@ export async function POST(request: Request) {
           WHERE p.created_at BETWEEN ? AND ?
           ORDER BY p.created_at DESC
         `;
-        params = [startDate, endDate];
+        params = [effectiveStartDate, effectiveEndDate];
+        break;
+
+      case 'events':
+        query = `
+          SELECT 
+            e.id,
+            e.title,
+            e.description,
+            e.location,
+            e.start_time,
+            e.end_time,
+            e.capacity,
+            e.status,
+            e.created_by,
+            e.created_at,
+            COUNT(er.id) as registration_count
+          FROM events e
+          LEFT JOIN event_registrations er ON e.id = er.event_id
+          WHERE e.created_at BETWEEN ? AND ?
+          GROUP BY e.id
+          ORDER BY e.created_at DESC
+        `;
+        params = [effectiveStartDate, effectiveEndDate];
         break;
 
       case 'attendance':
@@ -123,7 +218,7 @@ export async function POST(request: Request) {
           WHERE a.created_at BETWEEN ? AND ?
           ORDER BY a.created_at DESC
         `;
-        params = [startDate, endDate];
+        params = [effectiveStartDate, effectiveEndDate];
         break;
 
       case 'inventory':
@@ -143,7 +238,7 @@ export async function POST(request: Request) {
           WHERE i.created_at BETWEEN ? AND ?
           ORDER BY i.created_at DESC
         `;
-        params = [startDate, endDate];
+        params = [effectiveStartDate, effectiveEndDate];
         break;
 
       case 'event':
@@ -164,7 +259,7 @@ export async function POST(request: Request) {
           GROUP BY e.id
           ORDER BY e.created_at DESC
         `;
-        params = [startDate, endDate];
+        params = [effectiveStartDate, effectiveEndDate];
         break;
 
       default:

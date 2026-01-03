@@ -98,23 +98,30 @@ export default function MembershipCardPage() {
     ctx.fill();
     ctx.globalAlpha = 1;
 
-    // Draw logo background - exact white color
+    // Draw logo background - circular
     ctx.fillStyle = 'white';
     ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
     ctx.shadowBlur = 10;
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
     ctx.beginPath();
-    ctx.roundRect(32, 16, 80, 80, 10);
+    ctx.arc(72, 56, 40, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
+    // Create clipping path for circular logo
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(72, 56, 40, 0, Math.PI * 2);
+    ctx.clip();
+
     // Draw actual logo image if available
     const logoImg = new Image();
     logoImg.onload = () => {
-      ctx.drawImage(logoImg, 40, 20, 64, 64);
+      ctx.drawImage(logoImg, 32, 16, 80, 80);
+      ctx.restore();
       drawCardContent();
     };
     logoImg.onerror = () => {
@@ -124,6 +131,7 @@ export default function MembershipCardPage() {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('TLA', 72, 56);
+      ctx.restore();
       drawCardContent();
     };
     logoImg.src = '/logo.png';
@@ -153,12 +161,29 @@ export default function MembershipCardPage() {
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 0;
 
-      // Draw profile picture or initial - exact colors
-      ctx.fillStyle = '#4ade80'; // green-400 (exact match)
-      ctx.font = 'bold 40px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(user?.name?.charAt(0)?.toUpperCase() || 'M', canvas.width - 80, 80);
+      // Create clipping path for circular profile picture
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(canvas.width - 80, 80, 40, 0, Math.PI * 2);
+      ctx.clip();
+
+      // Draw profile picture image if available
+      if (user?.profile?.personalInfo?.profilePicture) {
+        const profileImg = new Image();
+        profileImg.onload = () => {
+          ctx.drawImage(profileImg, canvas.width - 120, 40, 80, 80);
+          ctx.restore();
+        };
+        profileImg.src = user.profile.personalInfo.profilePicture;
+      } else {
+        // Draw profile picture or initial - exact colors
+        ctx.fillStyle = '#4ade80'; // green-400 (exact match)
+        ctx.font = 'bold 40px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(user?.name?.charAt(0)?.toUpperCase() || 'M', canvas.width - 80, 80);
+        ctx.restore();
+      }
 
       // Draw member name section - exact positioning
       ctx.fillStyle = '#bbf7d0'; // green-100 (exact match)
@@ -331,9 +356,9 @@ export default function MembershipCardPage() {
             <circle cx="60" cy="160" r="30" fill="white" opacity="0.12" filter="url(#blur2)"/>
             <circle cx="168" cy="106" r="50" fill="white" opacity="0.08" filter="url(#blur3)"/>
             
-            <!-- Logo background -->
-            <rect x="16" y="8" width="40" height="40" fill="white" rx="6" ry="6" stroke="none"/>
-            <text x="36" y="36" font-family="Arial" font-size="20" font-weight="bold" fill="#15803d" text-anchor="middle" dominant-baseline="middle">TLA</text>
+            <!-- Logo background - circular -->
+            <circle cx="36" cy="28" r="20" fill="white" stroke="none"/>
+            <text x="36" y="28" font-family="Arial" font-size="20" font-weight="bold" fill="#15803d" text-anchor="middle" dominant-baseline="middle">TLA</text>
             
             <!-- Organization name -->
             <text x="168" y="32" font-family="Arial" font-size="12" font-weight="bold" fill="white" text-anchor="middle">Tanzania Library and</text>
@@ -630,19 +655,29 @@ export default function MembershipCardPage() {
                   <circle cx="60" cy="160" r="30" fill="white" opacity="0.12" filter="url(#blur2)"/>
                   <circle cx="168" cy="106" r="50" fill="white" opacity="0.08" filter="url(#blur3)"/>
                   
-                  {/* Logo background - maximized size */}
-                  <rect x="8" y="4" width="56" height="56" fill="white" rx="8" ry="8" stroke="none"/>
-                  <image x="8" y="4" width="56" height="56" href="/logo.png" style={{ imageRendering: 'crisp-edges' }}/>
+                  {/* Logo background - circular */}
+                  <circle cx="36" cy="32" r="28" fill="white" stroke="none"/>
+                  <defs>
+                    <clipPath id="logoClip">
+                      <circle cx="36" cy="32" r="28"/>
+                    </clipPath>
+                  </defs>
+                  <image x="8" y="4" width="56" height="56" href="/logo.png" clipPath="url(#logoClip)" style={{ imageRendering: 'crisp-edges' }}/>
                   
                   {/* Organization name */}
                   <text x="168" y="32" fontFamily="Arial" fontSize="12" fontWeight="bold" fill="white" textAnchor="middle">Tanzania Library and</text>
                   <text x="168" y="48" fontFamily="Arial" fontSize="12" fontWeight="bold" fill="white" textAnchor="middle">Information Association</text>
                   <text x="168" y="62" fontFamily="Arial" fontSize="12" fill="#bbf7d0" textAnchor="middle">(TLA)</text>
                   
-                  {/* Profile picture - maximized size */}
+                  {/* Profile picture - circular */}
                   <circle cx="296" cy="32" r="28" fill="white" stroke="rgba(255,255,255,0.2)" strokeWidth="2"/>
+                  <defs>
+                    <clipPath id="profileClip">
+                      <circle cx="296" cy="32" r="28"/>
+                    </clipPath>
+                  </defs>
                   {user?.profile?.personalInfo?.profilePicture ? (
-                    <image x="268" y="4" width="56" height="56" href={user.profile.personalInfo.profilePicture} style={{ imageRendering: 'crisp-edges' }}/>
+                    <image x="268" y="4" width="56" height="56" href={user.profile.personalInfo.profilePicture} clipPath="url(#profileClip)" style={{ imageRendering: 'crisp-edges' }}/>
                   ) : (
                     <circle cx="296" cy="32" r="28" fill="url(#profileGradient)"/>
                   )}
