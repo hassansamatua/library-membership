@@ -33,6 +33,7 @@ export default function UsersManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [activeTab, setActiveTab] = useState<'all' | 'approved' | 'pending'>('all');
 
   useEffect(() => {
     if (!isAuthLoading && !isAuthenticated) {
@@ -117,10 +118,27 @@ export default function UsersManagementPage() {
     );
   };
 
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (activeTab === 'approved') {
+      return matchesSearch && user.isApproved;
+    } else if (activeTab === 'pending') {
+      return matchesSearch && !user.isApproved;
+    }
+    return matchesSearch;
+  });
+
+  const getTabCounts = () => {
+    return {
+      all: users.length,
+      approved: users.filter(u => u.isApproved).length,
+      pending: users.filter(u => !u.isApproved).length
+    };
+  };
+
+  const tabCounts = getTabCounts();
 
   if (isPageLoading) {
     return (
@@ -137,6 +155,53 @@ export default function UsersManagementPage() {
         <p className="text-gray-600">View, edit, approve, and manage user accounts</p>
       </div>
 
+      {/* Tabs */}
+      <div className="bg-white rounded-lg shadow mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                activeTab === 'all'
+                  ? 'border-green-500 text-green-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              All Users
+              <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
+                {tabCounts.all}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('approved')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                activeTab === 'approved'
+                  ? 'border-green-500 text-green-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Approved Users
+              <span className="ml-2 bg-green-100 text-green-600 py-0.5 px-2 rounded-full text-xs">
+                {tabCounts.approved}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                activeTab === 'pending'
+                  ? 'border-green-500 text-green-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Pending Users
+              <span className="ml-2 bg-yellow-100 text-yellow-600 py-0.5 px-2 rounded-full text-xs">
+                {tabCounts.pending}
+              </span>
+            </button>
+          </nav>
+        </div>
+      </div>
+
       {/* Search and filters */}
       <div className="bg-white rounded-lg shadow mb-6 p-4">
         <div className="flex flex-col sm:flex-row gap-4">
@@ -145,7 +210,7 @@ export default function UsersManagementPage() {
               <FiSearch className="absolute left-3 top-1/2 h-5 w-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search users by name or email..."
+                placeholder={`Search ${activeTab === 'all' ? 'all' : activeTab} users by name or email...`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"

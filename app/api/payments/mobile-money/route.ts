@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { azampayService } from '@/lib/azampay';
+import { mobileMoneyService } from '@/lib/mobile-money';
 import { getUserById } from '@/lib/auth';
+import { updateMembershipPayment } from '@/lib/membership';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { membershipType, amount, userId, paymentMethod, phoneNumber, customerName, customerEmail } = body;
+    const { membershipType, amount, userId, paymentMethod, phoneNumber, customerName } = body;
 
     if (!membershipType || !amount || !userId || !paymentMethod || !phoneNumber) {
       return NextResponse.json(
         { error: 'Missing required fields: membershipType, amount, userId, paymentMethod, phoneNumber' },
+        { status: 400 }
+      );
+    }
+
+    // Validate phone number for the selected provider
+    if (!mobileMoneyService.validatePhoneNumber(phoneNumber, paymentMethod)) {
+      return NextResponse.json(
+        { error: `Invalid ${paymentMethod} phone number format` },
         { status: 400 }
       );
     }
@@ -26,33 +35,23 @@ export async function POST(request: NextRequest) {
     // Generate unique order ID
     const orderId = `TLA-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Extract phone number from user profile
-    let userPhone = '+255000000000'; // Default fallback
-    if (user.profile) {
-      const profile = user.profile as any;
-      userPhone = profile.phone || 
-                  JSON.parse(profile.contact_info || '{}')?.phone || 
-                  '+255000000000';
-    }
-
     // Create payment record first
     const { pool } = await import('@/lib/db');
     const connection = await pool.getConnection();
     
     try {
-      // Try direct insertion since table structure is now correct
       await connection.query(
         `INSERT INTO payments (reference, user_id, membership_type, amount, currency, status, payment_method, phone_number, created_at)
          VALUES (?, ?, ?, ?, 'TZS', 'pending', ?, ?, NOW())`,
         [orderId, userId, membershipType, amount, paymentMethod, phoneNumber]
       );
       
-      console.log('Payment record created successfully');
+      console.log('Mobile money payment record created successfully');
       
     } catch (dbError: any) {
       console.error('Database error:', dbError);
       
-      // If table doesn't exist, create it with phone_number column
+      // If table doesn't exist, create it
       if (dbError.code === 'ER_NO_SUCH_TABLE') {
         console.log('Creating payments table...');
         try {
@@ -68,7 +67,6 @@ export async function POST(request: NextRequest) {
               payment_method VARCHAR(50),
               phone_number VARCHAR(20),
               transaction_id VARCHAR(100),
-              checkout_url TEXT,
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               paid_at TIMESTAMP NULL DEFAULT NULL,
               updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -98,75 +96,61 @@ export async function POST(request: NextRequest) {
       connection.release();
     }
 
-    // Try AzamPay checkout
+    // Initiate direct mobile money payment
     try {
-      const checkoutResponse = await azampayService.createMembershipPayment({
-        userId,
-        membershipType,
+      const paymentResponse = await mobileMoneyService.initiatePayment({
+        provider: paymentMethod,
+        phoneNumber: mobileMoneyService.formatPhoneNumber(phoneNumber, paymentMethod),
         amount,
-        userEmail: customerEmail || user.email,
-        userPhone: phoneNumber,
-        orderId,
-        paymentMethod, // Pass the selected mobile money provider
+        reference: orderId,
+        customerName: customerName || user.name || 'Customer'
       });
 
-      // Update payment record with checkout URL
+      if (paymentResponse.success) {
+        // Update payment record with transaction ID
+        const connection2 = await pool.getConnection();
+        try {
+          await connection2.query(
+            'UPDATE payments SET transaction_id = ? WHERE reference = ?',
+            [paymentResponse.transactionId, orderId]
+          );
+        } finally {
+          connection2.release();
+        }
+
+        return NextResponse.json({
+          success: true,
+          transactionId: paymentResponse.transactionId,
+          reference: orderId,
+          provider: paymentMethod,
+          phoneNumber,
+          amount,
+          currency: 'TZS',
+          message: paymentResponse.message,
+          status: paymentResponse.status,
+          ussdCode: mobileMoneyService.getUSSDCode(paymentMethod)
+        });
+      } else {
+        throw new Error(paymentResponse.message);
+      }
+
+    } catch (mobileMoneyError) {
+      console.error('Mobile money payment failed:', mobileMoneyError);
+      
+      // Update payment status to failed
       const connection2 = await pool.getConnection();
       try {
         await connection2.query(
-          'UPDATE payments SET checkout_url = ? WHERE reference = ?',
-          [checkoutResponse.data.checkoutUrl, orderId]
+          'UPDATE payments SET status = ? WHERE reference = ?',
+          ['failed', orderId]
         );
       } finally {
         connection2.release();
       }
-
-      // If in test mode, immediately complete the payment
-      if (process.env.AZAMPAY_TEST_MODE === 'true' && checkoutResponse.data.reference.startsWith('TEST-')) {
-        console.log('Test mode: Immediately completing payment');
-        
-        // Update payment status to completed
-        const { updateMembershipPayment } = await import('@/lib/membership');
-        await updateMembershipPayment({
-          reference: checkoutResponse.data.reference,
-          transactionId: checkoutResponse.data.transactionId,
-          amount,
-          paymentMethod: 'Test Payment',
-          status: 'completed',
-          paidAt: new Date(),
-        });
-
-        return NextResponse.json({
-          success: true,
-          checkoutUrl: checkoutResponse.data.checkoutUrl,
-          reference: checkoutResponse.data.reference,
-          transactionId: checkoutResponse.data.transactionId,
-          orderId,
-          amount,
-          currency: 'TZS',
-          testMode: true,
-          immediatelyCompleted: true,
-        });
-      }
-
-      return NextResponse.json({
-        success: true,
-        checkoutUrl: checkoutResponse.data.checkoutUrl,
-        reference: checkoutResponse.data.reference,
-        transactionId: checkoutResponse.data.transactionId,
-        orderId,
-        amount,
-        currency: 'TZS',
-      });
-
-    } catch (azampayError) {
-      console.error('AzamPay checkout failed:', azampayError);
       
-      // Fallback: Create a manual payment record and show payment instructions
       return NextResponse.json({
         success: false,
-        fallback: true,
-        error: 'Payment gateway temporarily unavailable. Please contact support.',
+        error: 'Mobile money payment failed. Please try again or contact support.',
         reference: orderId,
         amount,
         currency: 'TZS',
@@ -180,9 +164,9 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Payment checkout error:', error);
+    console.error('Mobile money checkout error:', error);
     return NextResponse.json(
-      { error: 'Failed to create payment checkout' },
+      { error: 'Failed to create mobile money payment' },
       { status: 500 }
     );
   }
@@ -191,25 +175,38 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const reference = searchParams.get('reference');
+  const provider = searchParams.get('provider');
 
-  if (!reference) {
+  if (!reference || !provider) {
     return NextResponse.json(
-      { error: 'Reference parameter is required' },
+      { error: 'Reference and provider parameters are required' },
       { status: 400 }
     );
   }
 
   try {
-    const paymentStatus = await azampayService.checkPaymentStatus(reference);
+    const paymentStatus = await mobileMoneyService.checkPaymentStatus(provider, reference);
+    
+    if (paymentStatus.success && paymentStatus.status === 'completed') {
+      // Update membership status in database
+      await updateMembershipPayment({
+        reference,
+        transactionId: paymentStatus.transactionId,
+        amount: 0, // We'll get this from the payment record
+        paymentMethod: provider,
+        status: 'completed',
+        paidAt: new Date(),
+      });
+    }
     
     return NextResponse.json({
       success: true,
       status: paymentStatus,
     });
   } catch (error) {
-    console.error('AzamPay status check error:', error);
+    console.error('Mobile money status check error:', error);
     return NextResponse.json(
-      { error: 'Failed to check payment status' },
+      { error: 'Failed to check mobile money payment status' },
       { status: 500 }
     );
   }

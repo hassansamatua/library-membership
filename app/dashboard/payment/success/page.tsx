@@ -15,14 +15,50 @@ export default function PaymentSuccessPage() {
 
   useEffect(() => {
     const referenceParam = searchParams.get('reference');
+    const testMode = searchParams.get('test');
+    
     if (referenceParam) {
       setReference(referenceParam);
-      checkPaymentStatus(referenceParam);
+      
+      // If test mode, immediately show success and activate membership
+      if (testMode === 'true' || referenceParam.startsWith('TEST-')) {
+        setStatus('success');
+        setMessage('Test payment successful! Your membership has been activated.');
+        
+        // For test payments, activate membership via server action
+        activateTestMembership(referenceParam);
+      } else {
+        // Real payment - check status
+        checkPaymentStatus(referenceParam);
+      }
     } else {
       setStatus('failed');
       setMessage('No payment reference found');
     }
   }, [searchParams]);
+
+  const activateTestMembership = async (ref: string) => {
+    try {
+      // For test payments, activate membership via server API
+      const response = await fetch('/api/payments/activate-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reference: ref }),
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        console.log('Test membership activated for reference:', ref);
+      } else {
+        console.error('Failed to activate test membership');
+      }
+    } catch (error) {
+      console.error('Error activating test membership:', error);
+      // Don't show error to user, just log it
+    }
+  };
 
   const checkPaymentStatus = async (ref: string) => {
     try {
@@ -32,15 +68,15 @@ export default function PaymentSuccessPage() {
       if (response.ok && data.success) {
         const paymentStatus = data.status;
         
-        if (paymentStatus.status === 'SUCCESS') {
+        if (paymentStatus.data.status === 'SUCCESS') {
           setStatus('success');
           setMessage('Payment successful! Your membership has been activated.');
           
-          // Refresh membership status
-          setTimeout(() => {
-            router.push('/dashboard/membership-card');
-          }, 3000);
-        } else if (paymentStatus.status === 'FAILED') {
+          // Don't auto-redirect - let user choose when to view card
+          // setTimeout(() => {
+          //   router.push('/dashboard/membership-card');
+          // }, 3000);
+        } else if (paymentStatus.data.status === 'FAILED') {
           setStatus('failed');
           setMessage('Payment failed. Please try again or contact support.');
         } else {

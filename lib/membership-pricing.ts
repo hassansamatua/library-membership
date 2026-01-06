@@ -39,10 +39,10 @@ export function calculateMembershipPricing(
 
   // Calculate penalty (10,000 TZS per year after March)
   let penaltyAmount = 0;
-  if (isLate) {
-    // Calculate how many years have passed without payment
-    const yearsSinceStart = currentYear - (today.getFullYear() - (today.getMonth() >= 1 ? 0 : 1));
-    penaltyAmount = yearsSinceStart * 10000;
+  if (isLate && !isNewUser) {
+    // Only apply penalty to continuing members who are late
+    const yearsLate = Math.max(0, currentYear - today.getFullYear() + (today.getMonth() >= 1 ? 0 : 1));
+    penaltyAmount = Math.min(yearsLate * 10000, 50000); // Cap penalty at 50,000
   }
 
   const totalDue = baseAmount + penaltyAmount;

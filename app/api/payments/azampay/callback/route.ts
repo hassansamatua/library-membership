@@ -28,32 +28,32 @@ export async function POST(request: NextRequest) {
     // Get payment status from AzamPay to verify
     const paymentStatus = await azampayService.checkPaymentStatus(reference);
 
-    if (paymentStatus.status === 'SUCCESS') {
+    if (paymentStatus.data.status === 'SUCCESS') {
       // Update membership status in database
       await updateMembershipPayment({
         reference,
-        transactionId: paymentStatus.transactionId || transactionId,
-        amount: paymentStatus.amount,
+        transactionId: paymentStatus.data.transactionId || transactionId,
+        amount: parseFloat(paymentStatus.data.amount),
         paymentMethod: paymentMethod || 'unknown',
         status: 'completed',
         paidAt: new Date(),
       });
 
       // Log successful payment
-      console.log(`Payment successful: ${reference} - Amount: ${paymentStatus.amount} TZS`);
+      console.log(`Payment successful: ${reference} - Amount: ${paymentStatus.data.amount} TZS`);
 
       return NextResponse.json({ 
         success: true, 
         status: 'completed',
         reference,
-        transactionId: paymentStatus.transactionId,
+        transactionId: paymentStatus.data.transactionId,
       });
-    } else if (paymentStatus.status === 'FAILED') {
+    } else if (paymentStatus.data.status === 'FAILED') {
       // Update payment status as failed
       await updateMembershipPayment({
         reference,
-        transactionId: paymentStatus.transactionId || transactionId,
-        amount: paymentStatus.amount,
+        transactionId: paymentStatus.data.transactionId || transactionId,
+        amount: parseFloat(paymentStatus.data.amount),
         paymentMethod: paymentMethod || 'unknown',
         status: 'failed',
         paidAt: new Date(),

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import { FiBook, FiUsers, FiCalendar, FiCheckCircle } from 'react-icons/fi';
 
 interface HomeContent {
@@ -15,6 +17,7 @@ interface HomeContent {
 export default function HomePage() {
   const [homeContent, setHomeContent] = useState<HomeContent[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     fetchHomeContent();
@@ -36,7 +39,7 @@ export default function HomePage() {
 
   // Fallback static content
   const staticContent = {
-    mainHeading: "Welcome to Tanzania Library Association",
+    mainHeading: "Welcome to Tanzania Library and Information Association",
     mainSubheading: "Empowering Knowledge, Connecting Communities",
     membershipHeading: "Membership Benefits",
     membershipItems: [
@@ -65,16 +68,22 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <section className="bg-gradient-to-r from-green-600 to-green-700 text-white py-20">
+      <section className="bg-linear-to-r from-green-600 to-green-700 text-white py-20">
         <div className="container mx-auto px-4">
           <div className="text-center">
             <h1 className="text-5xl font-bold mb-6">{mainHeading}</h1>
             <p className="text-xl mb-8 text-green-100">{mainSubheading}</p>
             <div className="flex justify-center space-x-4">
-              <button className="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+              <button 
+                onClick={() => router.push('/auth/login')}
+                className="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
+              >
                 Join TLA
               </button>
-              <button className="border-2 border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white hover:text-green-600 transition-colors">
+              <button 
+                onClick={() => router.push('/about')}
+                className="border-2 border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white hover:text-green-600 transition-colors"
+              >
                 Learn More
               </button>
             </div>
@@ -121,7 +130,10 @@ export default function HomePage() {
           <p className="text-green-100 mb-8 max-w-2xl mx-auto">
             Become part of our professional community and access exclusive resources, networking opportunities, and professional development.
           </p>
-          <button className="bg-white text-green-600 px-8 py-4 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+          <button 
+            onClick={() => router.push('/auth/register')}
+            className="bg-white text-green-600 px-8 py-4 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
+          >
             Get Started Today
           </button>
         </div>

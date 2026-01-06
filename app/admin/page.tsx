@@ -53,8 +53,8 @@ export default function AdminPage() {
         totalEvents: Array.isArray(events) ? events.length : 0,
         totalPayments: Array.isArray(payments) ? payments.length : 0,
         totalReports: Array.isArray(reports) ? reports.length : 0,
-        pendingApprovals: Array.isArray(users) ? users.filter((u: any) => !u.is_approved).length : 0,
-        activeMembers: Array.isArray(users) ? users.filter((u: any) => u.is_approved).length : 0
+        pendingApprovals: Array.isArray(users) ? users.filter((u: any) => !u.isApproved).length : 0,
+        activeMembers: Array.isArray(users) ? users.filter((u: any) => u.isApproved).length : 0
       });
     } catch (error) {
       console.error('Failed to fetch admin stats:', error);

@@ -431,7 +431,7 @@ export default function AdminMembershipPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           <div className="flex items-center">
                             <FiDollarSign className="h-4 w-4 mr-1" />
-                            {item.fee.toLocaleString()} {item.currency}
+                            {(item.fee || 0).toLocaleString()} {item.currency || 'TZS'}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

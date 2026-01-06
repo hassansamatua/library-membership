@@ -49,6 +49,7 @@ export default function ContactPage() {
   const email = contactContent.find(item => item.section_key === 'contact_email')?.content || staticContent.email;
   const phone = contactContent.find(item => item.section_key === 'contact_phone')?.content || staticContent.phone;
   const address = contactContent.find(item => item.section_key === 'contact_address')?.content || staticContent.address;
+  const mapUrl = contactContent.find(item => item.section_key === 'contact_map_url')?.content || null;
 
   if (loading) {
     return (
@@ -179,10 +180,71 @@ export default function ContactPage() {
           
           <div className="max-w-5xl mx-auto">
             <div className="bg-white p-8 rounded-xl shadow-lg">
-              <div className="aspect-w-16 aspect-h-9 bg-gray-200 rounded-lg flex items-center justify-center">
-                <div className="text-center">
-                  <FiMapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">Map will be displayed here</p>
+              {/* Interactive Map */}
+              <div className="aspect-w-16 aspect-h-9 rounded-lg overflow-hidden">
+                {mapUrl ? (
+                  // Custom map URL from database
+                  <iframe
+                    src={mapUrl}
+                    className="w-full h-full border-0"
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    title="Tanzania Library Association Location"
+                  />
+                ) : (
+                  // Default OpenStreetMap for Dar es Salaam
+                  <iframe
+                    src="https://www.openstreetmap.org/export/embed.html?bbox=39.2080%2C-6.8220%2C39.2280%2C-6.8020&layer=mapnik&marker=39.2180%2C-6.8120"
+                    className="w-full h-full border-0"
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    title="Tanzania Library Association Location - Dar es Salaam"
+                  />
+                )}
+              </div>
+              
+              {/* Map Controls */}
+              <div className="mt-6 flex flex-wrap gap-4 justify-center">
+                <button
+                  onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=Tanzania+Library+Association+Dar+es+Salaam`, '_blank')}
+                  className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors inline-flex items-center"
+                >
+                  <FiMapPin className="mr-2 h-5 w-5" />
+                  Open in Google Maps
+                </button>
+                
+                <button
+                  onClick={() => window.open(`https://www.openstreetmap.org/search?query=Tanzania%20Library%20Association%20Dar%20es%20Salaam`, '_blank')}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors inline-flex items-center"
+                >
+                  <FiMapPin className="mr-2 h-5 w-5" />
+                  Open in OpenStreetMap
+                </button>
+                
+                {mapUrl && (
+                  <button
+                    onClick={() => window.open(mapUrl, '_blank')}
+                    className="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors inline-flex items-center"
+                  >
+                    <FiMapPin className="mr-2 h-5 w-5" />
+                    View Full Map
+                  </button>
+                )}
+              </div>
+              
+              {/* Address Information */}
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-start space-x-3">
+                  <FiMapPin className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-1">Visit Us</h4>
+                    <p className="text-gray-600">{address}</p>
+                    <p className="text-gray-600 text-sm mt-1">
+                      Located in Dar es Salaam, Tanzania
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

@@ -46,13 +46,10 @@ export async function GET(
     connection = await pool.getConnection();
     
     const [events] = await connection.query<RowDataPacket[]>(
-      `SELECT e.*, u.name as created_by_name, u.email as created_by_email,
-              COUNT(a.id) as attendee_count
+      `SELECT e.*, u.name as created_by_name, u.email as created_by_email
        FROM events e
        LEFT JOIN users u ON e.created_by = u.id
-       LEFT JOIN attendance a ON e.id = a.event_id
-       WHERE e.id = ?
-       GROUP BY e.id`,
+       WHERE e.id = ?`,
       [eventId]
     );
 
@@ -63,25 +60,96 @@ export async function GET(
       );
     }
 
-    // Get attendees for this event
-    const [attendees] = await connection.query<RowDataPacket[]>(
-      `SELECT a.*, u.name, u.email
-       FROM attendance a
-       JOIN users u ON a.user_id = u.id
-       WHERE a.event_id = ?
-       ORDER BY a.registration_date DESC`,
-      [eventId]
-    );
-
-    return NextResponse.json({
-      event: events[0],
-      attendees
-    });
+    return NextResponse.json(events[0]);
 
   } catch (error) {
     console.error('Error fetching event:', error);
     return NextResponse.json(
       { message: 'Failed to fetch event' },
+      { status: 500 }
+    );
+  } finally {
+    if (connection) connection.release();
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  let connection;
+  try {
+    const resolvedParams = await params;
+    const eventId = resolvedParams.id;
+
+    const authHeader = request.headers.get('authorization');
+    const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const cookieStore = await cookies();
+    const cookieToken = cookieStore.get('token')?.value;
+    const token = authToken || cookieToken;
+
+    if (!token) {
+      return NextResponse.json(
+        { message: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    let decoded;
+    try {
+      decoded = verifyToken(token);
+    } catch {
+      return NextResponse.json(
+        { message: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    if (!decoded?.isAdmin) {
+      return NextResponse.json(
+        { message: 'Admin access required' },
+        { status: 403 }
+      );
+    }
+
+    const body = await request.json().catch(() => ({} as any));
+    const { status } = body;
+
+    if (!status) {
+      return NextResponse.json(
+        { message: 'Status is required' },
+        { status: 400 }
+      );
+    }
+
+    connection = await pool.getConnection();
+    
+    const [result] = await connection.query<ResultSetHeader>(
+      'UPDATE events SET status = ? WHERE id = ?',
+      [status, eventId]
+    );
+
+    if (result.affectedRows === 0) {
+      return NextResponse.json(
+        { message: 'Event not found' },
+        { status: 404 }
+      );
+    }
+
+    const [updatedEvent] = await connection.query<RowDataPacket[]>(
+      'SELECT * FROM events WHERE id = ?',
+      [eventId]
+    );
+
+    return NextResponse.json({
+      message: 'Event status updated successfully',
+      event: updatedEvent[0]
+    });
+
+  } catch (error) {
+    console.error('Error updating event status:', error);
+    return NextResponse.json(
+      { message: 'Failed to update event status' },
       { status: 500 }
     );
   } finally {

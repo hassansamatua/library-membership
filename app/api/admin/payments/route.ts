@@ -72,10 +72,12 @@ export async function GET(request: Request) {
     // User fields
     if (userColumnSet.has('name')) {
       selectFields.push('u.name as userName');
-    } else if (userColumnSet.has('fullName')) {
-      selectFields.push('u.fullName as userName');
+    } else if (userColumnSet.has('full_name')) {
+      selectFields.push('u.full_name as userName');
     }
-    selectFields.push(userColumnSet.has('email') ? 'u.email as userEmail' : 'u.email as userEmail');
+    if (userColumnSet.has('email')) {
+      selectFields.push('u.email as userEmail');
+    }
     
     // Payment fields based on actual schema
     selectFields.push('NULL as membershipType'); // Not in payments table
