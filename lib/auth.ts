@@ -13,16 +13,40 @@ export async function comparePasswords(plainPassword: string, hashedPassword: st
     console.log('Comparing passwords...');
     console.log('Plain password (first 5 chars):', plainPassword.substring(0, 5) + '...');
     console.log('Hashed password (first 10 chars):', hashedPassword.substring(0, 10) + '...');
+    console.log('Hash format:', hashedPassword.substring(0, 3));
     
-    // Check if hashed password starts with the bcrypt identifier
-    if (!hashedPassword.startsWith('$2a$') && !hashedPassword.startsWith('$2b$')) {
-      console.error('Invalid hash format - not a bcrypt hash');
-      return false;
+    // Check hash format and use appropriate comparison method
+    if (hashedPassword.startsWith('$2a$') || hashedPassword.startsWith('$2b$')) {
+      // bcrypt hash format
+      const result = await bcrypt.compare(plainPassword, hashedPassword);
+      console.log('bcrypt.compare result:', result);
+      return result;
+    } else if (hashedPassword.startsWith('$2y$')) {
+      // Newer bcrypt format
+      const result = await bcrypt.compare(plainPassword, hashedPassword);
+      console.log('bcrypt.compare result (2y$):', result);
+      return result;
+    } else if (hashedPassword.length === 32 && !hashedPassword.includes('$')) {
+      // Might be MD5 hash
+      const crypto = require('crypto');
+      const md5Hash = crypto.createHash('md5').update(plainPassword).digest('hex');
+      const result = md5Hash === hashedPassword;
+      console.log('MD5 comparison result:', result);
+      return result;
+    } else if (hashedPassword.length === 40 && hashedPassword.startsWith('$')) {
+      // SHA-1 hash
+      const crypto = require('crypto');
+      const sha1Hash = crypto.createHash('sha1').update(plainPassword).digest('hex');
+      const result = sha1Hash === hashedPassword;
+      console.log('SHA-1 comparison result:', result);
+      return result;
+    } else {
+      console.error('Unknown hash format:', hashedPassword.substring(0, 20));
+      // Try bcrypt as fallback
+      const result = await bcrypt.compare(plainPassword, hashedPassword);
+      console.log('Fallback bcrypt.compare result:', result);
+      return result;
     }
-    
-    const result = await bcrypt.compare(plainPassword, hashedPassword);
-    console.log('bcrypt.compare result:', result);
-    return result;
   } catch (error) {
     console.error('Error comparing passwords:', error);
     return false;

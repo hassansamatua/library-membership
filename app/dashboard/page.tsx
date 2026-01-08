@@ -160,10 +160,10 @@ export default function DashboardPage() {
       action: () => router.push('/dashboard/events')
     },
     { 
-      title: 'Messages', 
-      description: 'View your messages and notifications',
+      title: 'News', 
+      description: 'View news and notifications from admin',
       icon: <FiMail className="h-6 w-6 text-blue-600" />,
-      action: () => router.push('/dashboard/messages')
+      action: () => router.push('/dashboard/news')
     },
   ];
 

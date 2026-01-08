@@ -26,7 +26,6 @@ export default function RegisterPage() {
     nida: "",
     membershipType: "personal" as MembershipType,
     phoneNumber: "",
-    otherPhoneNumber: "",
     organizationName: "",
     // New fields
     dateOfBirth: "",
@@ -76,9 +75,43 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
 
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
+    // Get current form values directly from the event to avoid state timing issues
+    const form = e.target as HTMLFormElement;
+    const formDataFromForm = new FormData(form);
+    
+    const password = formDataFromForm.get('password') as string || "";
+    const confirmPassword = formDataFromForm.get('confirmPassword') as string || "";
+
+    // Trim passwords to remove leading/trailing whitespace
+    const trimmedPassword = password?.trim() || "";
+    const trimmedConfirmPassword = confirmPassword?.trim() || "";
+
+    // Comprehensive debugging
+    console.log('=== PASSWORD VALIDATION DEBUG ===');
+    console.log('Raw password:', JSON.stringify(password));
+    console.log('Raw confirmPassword:', JSON.stringify(confirmPassword));
+    console.log('Trimmed password:', JSON.stringify(trimmedPassword));
+    console.log('Trimmed confirmPassword:', JSON.stringify(trimmedConfirmPassword));
+    console.log('Password length:', password.length);
+    console.log('Confirm password length:', confirmPassword.length);
+    console.log('Trimmed password length:', trimmedPassword.length);
+    console.log('Trimmed confirm password length:', trimmedConfirmPassword.length);
+    console.log('Exact match:', password === confirmPassword);
+    console.log('Trimmed match:', trimmedPassword === trimmedConfirmPassword);
+    console.log('Strict equality test:', trimmedPassword === trimmedConfirmPassword);
+    console.log('Character codes password:', Array.from(trimmedPassword).map(c => c.charCodeAt(0)));
+    console.log('Character codes confirm:', Array.from(trimmedConfirmPassword).map(c => c.charCodeAt(0)));
+    console.log('=== END DEBUG ===');
+
+    // Simple validation - just check if they match after trim
+    if (trimmedPassword !== trimmedConfirmPassword) {
+      console.log('VALIDATION FAILED: Passwords do not match');
       setError("Passwords do not match");
+      return;
+    }
+
+    if (!trimmedPassword || trimmedPassword.length < 8) {
+      setError("Password must be at least 8 characters long");
       return;
     }
 
@@ -88,18 +121,21 @@ export default function RegisterPage() {
     }
 
     if (!formData.agreeToTerms || !formData.agreeToDataProcessing) {
-      setError("You must agree to the terms and conditions and data processing policy");
+      setError("You must agree to terms and conditions and data processing policy");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Prepare the data to send to the API
+      // Prepare data to send to API
       const userData = {
         ...formData,
-        // Remove confirmPassword and checkboxes from the data sent to the server
-        confirmPassword: undefined,
+        // Use trimmed password from form
+        password: trimmedPassword,
+        // Send confirmPassword for server-side validation
+        confirmPassword: trimmedConfirmPassword,
+        // Remove checkboxes from data sent to server
         agreeToTerms: undefined,
         agreeToDataProcessing: undefined
       };
@@ -238,6 +274,9 @@ export default function RegisterPage() {
                     onChange={handleChange}
                     placeholder="At least 8 characters"
                   />
+                  {formData.password && formData.password.length < 8 && (
+                    <p className="mt-1 text-sm text-red-600">Password must be at least 8 characters</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
@@ -253,6 +292,11 @@ export default function RegisterPage() {
                     onChange={handleChange}
                     placeholder="Confirm your password"
                   />
+                  {formData.confirmPassword && (
+                    <p className={`mt-1 text-sm ${formData.password.trim() === formData.confirmPassword.trim() ? 'text-green-600' : 'text-red-600'}`}>
+                      {formData.password.trim() === formData.confirmPassword.trim() ? 'Passwords match' : 'Passwords do not match'}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
@@ -264,18 +308,6 @@ export default function RegisterPage() {
                     required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
                     value={formData.phoneNumber}
-                    onChange={handleChange}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Other Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    name="otherPhoneNumber"
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                    value={formData.otherPhoneNumber}
                     onChange={handleChange}
                   />
                 </div>

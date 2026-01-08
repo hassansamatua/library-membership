@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
+import Image from "next/image";
 import { toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -79,6 +80,19 @@ export default function LoginPage() {
       <div className="max-w-md w-full p-8 mx-auto mt-20">
         <div className="text-center mb-10">
           <h2 className="text-3xl font-extrabold text-gray-900">Sign in to your account</h2>
+          <div className="mt-6 flex justify-center">
+            <Image 
+              src="/logo.png" 
+              alt="Logo" 
+              width={96}
+              height={96}
+              className="h-24 w-auto"
+              priority
+              onError={(e) => {
+                console.error('Logo failed to load:', e);
+              }}
+            />
+          </div>
           {registered && (
             <p className="mt-4 text-green-700">
               Registration successful! Please log in.
@@ -165,7 +179,7 @@ export default function LoginPage() {
                 href="/auth/register"
                 className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
               >
-                Create a new account
+                Join/ Create Account
               </Link>
             </div>
           </div>

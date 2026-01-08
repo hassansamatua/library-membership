@@ -22,10 +22,11 @@ interface User {
   email: string;
   isAdmin: boolean;
   isApproved: boolean;
+  status?: 'active' | 'pending' | 'rejected' | 'expired';
   createdAt: string;
 }
 
-export default function UsersManagementPage() {
+export default function MemberManagementPage() {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
   const [isPageLoading, setIsPageLoading] = useState(false);
@@ -33,7 +34,7 @@ export default function UsersManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
-  const [activeTab, setActiveTab] = useState<'all' | 'approved' | 'pending'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'approved' | 'pending' | 'rejected' | 'expired'>('all');
 
   useEffect(() => {
     if (!isAuthLoading && !isAuthenticated) {
@@ -125,7 +126,11 @@ export default function UsersManagementPage() {
     if (activeTab === 'approved') {
       return matchesSearch && user.isApproved;
     } else if (activeTab === 'pending') {
-      return matchesSearch && !user.isApproved;
+      return matchesSearch && !user.isApproved && user.status !== 'rejected' && user.status !== 'expired';
+    } else if (activeTab === 'rejected') {
+      return matchesSearch && user.status === 'rejected';
+    } else if (activeTab === 'expired') {
+      return matchesSearch && user.status === 'expired';
     }
     return matchesSearch;
   });
@@ -134,7 +139,9 @@ export default function UsersManagementPage() {
     return {
       all: users.length,
       approved: users.filter(u => u.isApproved).length,
-      pending: users.filter(u => !u.isApproved).length
+      pending: users.filter(u => !u.isApproved && u.status !== 'rejected' && u.status !== 'expired').length,
+      rejected: users.filter(u => u.status === 'rejected').length,
+      expired: users.filter(u => u.status === 'expired').length
     };
   };
 
@@ -151,8 +158,8 @@ export default function UsersManagementPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">User Management</h1>
-        <p className="text-gray-600">View, edit, approve, and manage user accounts</p>
+        <h1 className="text-2xl font-semibold text-gray-900">Member Management</h1>
+        <p className="text-gray-600">View, edit, approve, and manage member accounts</p>
       </div>
 
       {/* Tabs */}
@@ -196,6 +203,32 @@ export default function UsersManagementPage() {
               Pending Users
               <span className="ml-2 bg-yellow-100 text-yellow-600 py-0.5 px-2 rounded-full text-xs">
                 {tabCounts.pending}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('rejected')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                activeTab === 'rejected'
+                  ? 'border-red-500 text-red-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Rejected Users
+              <span className="ml-2 bg-red-100 text-red-600 py-0.5 px-2 rounded-full text-xs">
+                {tabCounts.rejected}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('expired')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                activeTab === 'expired'
+                  ? 'border-gray-500 text-gray-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Expired Users
+              <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
+                {tabCounts.expired}
               </span>
             </button>
           </nav>
@@ -288,11 +321,25 @@ export default function UsersManagementPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      user.isApproved
+                      user.status === 'rejected'
+                        ? 'bg-red-100 text-red-800'
+                        : user.status === 'expired'
+                        ? 'bg-gray-100 text-gray-800'
+                        : user.isApproved
                         ? 'bg-green-100 text-green-800'
                         : 'bg-yellow-100 text-yellow-800'
                     }`}>
-                      {user.isApproved ? (
+                      {user.status === 'rejected' ? (
+                        <>
+                          <FiXCircle className="mr-1 h-3 w-3" />
+                          Rejected
+                        </>
+                      ) : user.status === 'expired' ? (
+                        <>
+                          <FiXCircle className="mr-1 h-3 w-3" />
+                          Expired
+                        </>
+                      ) : user.isApproved ? (
                         <>
                           <FiCheck className="mr-1 h-3 w-3" />
                           Active
@@ -324,7 +371,7 @@ export default function UsersManagementPage() {
                       >
                         <FiEdit2 className="h-4 w-4" />
                       </button>
-                      {!user.isApproved && (
+                      {!user.isApproved && user.status !== 'rejected' && user.status !== 'expired' && (
                         <button
                           onClick={() => handleApprove(user.id)}
                           className="text-green-600 hover:text-green-900"
@@ -333,7 +380,16 @@ export default function UsersManagementPage() {
                           <FiCheck className="h-4 w-4" />
                         </button>
                       )}
-                      {user.isApproved && (
+                      {user.status === 'rejected' && (
+                        <button
+                          onClick={() => handleApprove(user.id)}
+                          className="text-green-600 hover:text-green-900"
+                          title="Re-approve User"
+                        >
+                          <FiCheck className="h-4 w-4" />
+                        </button>
+                      )}
+                      {user.isApproved && user.status !== 'expired' && (
                         <button
                           onClick={() => handleReject(user.id)}
                           className="text-yellow-600 hover:text-yellow-900"
@@ -342,13 +398,15 @@ export default function UsersManagementPage() {
                           <FiX className="h-4 w-4" />
                         </button>
                       )}
-                      <button
-                        onClick={() => handleDelete(user.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete User"
-                      >
-                        <FiTrash2 className="h-4 w-4" />
-                      </button>
+                      {user.status !== 'expired' && (
+                        <button
+                          onClick={() => handleDelete(user.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete User"
+                        >
+                          <FiTrash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

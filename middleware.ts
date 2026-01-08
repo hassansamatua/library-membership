@@ -4,14 +4,22 @@ import type { NextRequest } from 'next/server';
 
 // In middleware.ts
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Skip middleware for static files and Chrome DevTools
+  if (pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js)$/) || 
+      pathname.startsWith('/.well-known/') || 
+      pathname.startsWith('/_next/') || 
+      pathname.startsWith('/__webpack_hmr')) {
+    return NextResponse.next();
+  }
+
   // Check for token in both Authorization header and cookies
   const authHeader = request.headers.get('authorization');
   const token = authHeader?.startsWith('Bearer ') 
     ? authHeader.split(' ')[1] 
     : request.cookies.get('token')?.value;
   
-  const { pathname } = request.nextUrl;
-
   console.log(`[Middleware] Path: ${pathname}, Has Token: ${!!token}`);
 
   // Allow auth routes (except protected ones) and API routes
@@ -104,6 +112,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/auth/).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico).*)',
   ],
 };

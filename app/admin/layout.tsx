@@ -5,21 +5,22 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import {
+  FiHome,
   FiUsers,
-  FiUserPlus,
+  FiFile,
   FiCalendar,
-  FiCreditCard,
   FiBarChart2,
   FiSettings,
-  FiFileText,
+  FiLogOut,
   FiMenu,
   FiX,
-  FiLogOut,
-  FiHome,
-  FiAward,
-  FiFile,
   FiExternalLink,
+  FiUserPlus,
+  FiCreditCard,
+  FiFileText,
+  FiAward,
 } from 'react-icons/fi';
+import { FiBell } from 'react-icons/fi';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   console.log('[AdminLayout] Component rendering...');
@@ -64,8 +65,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const menuItems = [
     { name: 'Dashboard', href: '/admin', icon: FiHome },
-    { name: 'User Management', href: '/admin/users', icon: FiUsers },
-    { name: 'Membership', href: '/admin/membership', icon: FiAward },
+    { name: 'Member Management', href: '/admin/users', icon: FiUsers },
+    { name: 'News', href: '/admin/news', icon: FiBell },
     { name: 'Content Management', href: '/admin/content', icon: FiFile },
     { name: 'Events', href: '/admin/events', icon: FiCalendar },
     { name: 'Reports', href: '/admin/reports', icon: FiBarChart2 },
@@ -146,7 +147,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+          className="fixed inset-0 z-40 bg-gray-600 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}

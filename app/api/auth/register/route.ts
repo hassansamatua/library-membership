@@ -6,6 +6,24 @@ export async function POST(req: Request) {
   try {
     const formData = await req.json();
     
+    // Debug: Log received form data
+    console.log('=== REGISTRATION FORM DATA RECEIVED ===');
+    console.log('Full formData:', JSON.stringify(formData, null, 2));
+    console.log('dateOfBirth:', formData.dateOfBirth);
+    console.log('gender:', formData.gender);
+    console.log('street:', formData.street);
+    console.log('district:', formData.district);
+    console.log('region:', formData.region);
+    console.log('country:', formData.country);
+    console.log('postalCode:', formData.postalCode);
+    console.log('occupation:', formData.occupation);
+    console.log('employerName:', formData.employerName);
+    console.log('educationLevel:', formData.educationLevel);
+    console.log('institutionName:', formData.institutionName);
+    console.log('yearOfCompletion:', formData.yearOfCompletion);
+    console.log('skills:', formData.skills);
+    console.log('=== END FORM DATA ===');
+    
     // Extract user data for users table
     const userData = {
       name: formData.name,
@@ -88,7 +106,6 @@ export async function POST(req: Request) {
       // Prepare profile data for user_profiles table
       const profileData = {
         user_id: userId,
-        other_phone: formData.otherPhoneNumber || null,
         date_of_birth: formData.dateOfBirth || null,
         gender: formData.gender || null,
         address: formData.street ? `${formData.street}${formData.houseNumber ? ' ' + formData.houseNumber : ''}` : null,
@@ -97,17 +114,19 @@ export async function POST(req: Request) {
         country: formData.country || 'Tanzania',
         postal_code: formData.postalCode || null,
         job_title: formData.occupation || null,
+        current_position: null,
         industry: formData.employerName || null,
-        work_address: formData.workAddress || null,
-        work_phone: formData.workPhone || null,
-        work_email: formData.workEmail || null,
+        years_of_experience: null,
+        skills: formData.skills || null,
         highest_degree: formData.educationLevel || null,
+        field_of_study: null,
         institution: formData.institutionName || null,
         year_of_graduation: formData.yearOfCompletion || null,
-        skills: formData.skills || null,
-        membership_type: formData.membershipCategory || 'regular',
-        membership_number: `MEM${Date.now().toString().slice(-6)}`,
-        membership_status: 'pending',
+        additional_certifications: null,
+        areas_of_interest: null,
+        id_proof_path: null,
+        degree_certificates_path: null,
+        cv_path: null,
         join_date: new Date().toISOString().split('T')[0]
       };
 

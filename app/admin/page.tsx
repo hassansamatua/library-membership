@@ -14,7 +14,8 @@ export default function AdminPage() {
     totalPayments: 0,
     totalReports: 0,
     pendingApprovals: 0,
-    activeMembers: 0
+    activeMembers: 0,
+    expiredMembers: 0
   });
 
   useEffect(() => {
@@ -39,8 +40,8 @@ export default function AdminPage() {
       const [usersRes, eventsRes, paymentsRes, reportsRes] = await Promise.all([
         fetch('/api/admin/users', { credentials: 'include' }),
         fetch('/api/admin/events', { credentials: 'include' }),
-        fetch('/api/admin/payments', { credentials: 'include' }),
-        fetch('/api/admin/reports', { credentials: 'include' })
+        fetch('/api/payments', { credentials: 'include' }),
+        fetch('/api/reports', { credentials: 'include' })
       ]);
 
       const users = usersRes.ok ? await usersRes.json() : [];
@@ -48,13 +49,46 @@ export default function AdminPage() {
       const payments = paymentsRes.ok ? await paymentsRes.json() : [];
       const reports = reportsRes.ok ? await reportsRes.json() : [];
 
+      console.log('API Results:', {
+        users: users,
+        events: events,
+        payments: payments,
+        reports: reports
+      });
+
+      // Calculate expired members
+      const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth();
+      console.log('Current month:', currentMonth, 'Current year:', currentYear);
+      
+      const expiredMembers = Array.isArray(users) ? users.filter((u: any) => {
+        // Check if user has expired membership
+        const joinDate = new Date(u.created_at || u.join_date);
+        
+        // If we're past March and user hasn't paid for current year, they're expired
+        if (currentMonth > 2) { // After March
+          // Check if user has any payment for current year
+          const hasCurrentYearPayment = payments.some((p: any) => 
+            p.user_id === u.id && p.payment_year === currentYear
+          );
+          const isExpired = u.isApproved && !hasCurrentYearPayment;
+          console.log(`User ${u.id} (${u.name}): isApproved=${u.isApproved}, hasPayment=${hasCurrentYearPayment}, expired=${isExpired}`);
+          return isExpired;
+        }
+        
+        return false;
+      }).length : 0;
+      
+      console.log('Final expired members count:', expiredMembers);
+
       setStats({
         totalUsers: Array.isArray(users) ? users.length : 0,
         totalEvents: Array.isArray(events) ? events.length : 0,
         totalPayments: Array.isArray(payments) ? payments.length : 0,
         totalReports: Array.isArray(reports) ? reports.length : 0,
         pendingApprovals: Array.isArray(users) ? users.filter((u: any) => !u.isApproved).length : 0,
-        activeMembers: Array.isArray(users) ? users.filter((u: any) => u.isApproved).length : 0
+        activeMembers: Array.isArray(users) ? users.filter((u: any) => u.isApproved).length : 0,
+        expiredMembers
       });
     } catch (error) {
       console.error('Failed to fetch admin stats:', error);
@@ -81,7 +115,7 @@ export default function AdminPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
             <div className="p-3 bg-blue-100 rounded-full">
@@ -153,12 +187,24 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-3 bg-orange-100 rounded-full">
+              <FiActivity className="h-6 w-6 text-orange-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Expired Members</p>
+              <p className="text-2xl font-semibold text-gray-900">{stats.expiredMembers}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <button
             onClick={() => router.push('/admin/users')}
             className="flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -179,6 +225,13 @@ export default function AdminPage() {
           >
             <FiCreditCard className="mr-2 h-5 w-5" />
             Manage Payments
+          </button>
+          <button
+            onClick={() => router.push('/admin/users?tab=expired')}
+            className="flex items-center justify-center px-4 py-3 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+          >
+            <FiActivity className="mr-2 h-5 w-5" />
+            Expired Members
           </button>
         </div>
       </div>

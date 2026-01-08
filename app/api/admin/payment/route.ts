@@ -124,8 +124,7 @@ export async function GET(request: Request) {
         membershipNumber: user.membership_number,
         membershipStatus: membershipStatus.status,
         canViewMembershipId: canViewId,
-        isExpired: isExpired,
-        isFirstYear: getFirstMembershipYear(joinDate) === getCurrentMembershipYear()
+        isExpired: isExpired
       },
       paymentPlan,
       paymentWindow,
@@ -137,7 +136,7 @@ export async function GET(request: Request) {
     });
 
   } catch (error: any) {
-    console.error('Error in GET /api/admin/payments:', error);
+    console.error('Error in GET /api/admin/payment:', error);
     return NextResponse.json(
       { 
         success: false, 
@@ -244,8 +243,14 @@ export async function POST(request: Request) {
     try {
       // Process each year's payment
       for (const year of selectedYears) {
-        // Calculate penalty using new logic (no penalty for first-time users)
-        const penalty = calculatePenalty(joinDate, paidYears, year);
+        const dates = getMembershipYearDates(year);
+        const now = new Date();
+        let penalty = 0;
+
+        // Calculate penalty if overdue
+        if (now > dates.gracePeriodEnd) {
+          penalty = PENALTY_FEE;
+        }
 
         // Insert payment record
         await connection.query(
@@ -259,7 +264,7 @@ export async function POST(request: Request) {
             penalty,
             paymentMethod,
             transactionId || null,
-            new Date(),
+            now,
             'completed'
           ]
         );
@@ -294,7 +299,7 @@ export async function POST(request: Request) {
     }
 
   } catch (error: any) {
-    console.error('Error in POST /api/admin/payments:', error);
+    console.error('Error in POST /api/admin/payment:', error);
     return NextResponse.json(
       { 
         success: false, 

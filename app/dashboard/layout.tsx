@@ -14,7 +14,7 @@ import {
   FiHome,
   FiUser,
   FiCreditCard,
-  FiMessageSquare,
+  FiBell,
   FiLogOut,
   FiInfo,
   FiCalendar,
@@ -32,7 +32,7 @@ const calculateProfileCompletion = (user: any) => {
   let completedFields = 0;
   const totalFields = 25;
 
-  console.log('Calculating completion for user:', user.name, 'ID:', user.id);
+  console.log('Calculating completion for user: ' + user.name + ', ID: ' + user.id);
 
   // Personal Info fields (6)
   if (user.name) { completedFields++; console.log(' Name'); }
@@ -58,7 +58,7 @@ const calculateProfileCompletion = (user: any) => {
     if (employment.yearsOfExperience) { completedFields++; console.log(' Years of Experience'); }
     if (employment.skills && employment.skills.length > 0) { completedFields++; console.log(' Skills'); }
   } catch (e) {
-    console.log(' Failed to parse employment:', e.message);
+    console.log(' Failed to parse employment: ' + e.message);
   }
 
   // Education fields (3)
@@ -68,7 +68,7 @@ const calculateProfileCompletion = (user: any) => {
     if (education.length > 0 && education[0].institution) { completedFields++; console.log(' Institution'); }
     if (education.length > 0 && education[0].yearOfGraduation) { completedFields++; console.log(' Year of Graduation'); }
   } catch (e) {
-    console.log(' Failed to parse education:', e.message);
+    console.log(' Failed to parse education: ' + e.message);
   }
 
   // Documents fields (3)
@@ -81,7 +81,7 @@ const calculateProfileCompletion = (user: any) => {
   if (user.bio) { completedFields++; console.log(' Bio'); }
 
   const percentage = Math.round((completedFields / totalFields) * 100);
-  console.log(`Completed: ${completedFields}/${totalFields} = ${percentage}%`);
+  console.log('Completed: ' + completedFields + '/' + totalFields + ' = ' + percentage + '%');
   
   return percentage;
 };
@@ -98,6 +98,7 @@ export default function DashboardLayout({
   const [mounted, setMounted] = useState(false);
   const [membershipStatus, setMembershipStatus] = useState<any>(null);
   const [profileCompletion, setProfileCompletion] = useState(0);
+  const [unreadNewsCount, setUnreadNewsCount] = useState(0);
 
   // Handle hydration
   useEffect(() => {
@@ -120,6 +121,13 @@ export default function DashboardLayout({
         // Calculate profile completion
         const completion = calculateProfileCompletion(user);
         setProfileCompletion(completion);
+
+        // Fetch unread news count
+        const newsRes = await fetch('/api/news?limit=1', { credentials: 'include' });
+        if (newsRes.ok) {
+          const newsData = await newsRes.json();
+          setUnreadNewsCount(newsData.unreadCount || 0);
+        }
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       }
@@ -128,12 +136,34 @@ export default function DashboardLayout({
     loadData();
   }, [mounted, authLoading, user]);
 
+  // Refresh unread count when pathname changes (user returns from news page)
+  useEffect(() => {
+    if (!mounted || !user) return;
+    
+    const refreshUnreadCount = async () => {
+      try {
+        const newsRes = await fetch('/api/news?limit=1', { credentials: 'include' });
+        if (newsRes.ok) {
+          const newsData = await newsRes.json();
+          setUnreadNewsCount(newsData.unreadCount || 0);
+        }
+      } catch (error) {
+        console.error('Error refreshing unread count:', error);
+      }
+    };
+
+    // Refresh when user navigates back to dashboard
+    if (pathname === '/dashboard') {
+      refreshUnreadCount();
+    }
+  }, [mounted, user, pathname]);
+
   const menuItems = [
     { name: 'Dashboard', href: '/dashboard', icon: FiHome },
     { name: 'Profile', href: '/dashboard/complete-profile', icon: FiUser },
     { name: 'Membership Card', href: '/dashboard/membership-card', icon: FiAward },
     { name: 'Payment', href: '/dashboard/subscribe', icon: FiCreditCard },
-    { name: 'Messages', href: '/dashboard/messages', icon: FiMessageSquare },
+    { name: 'News', href: '/dashboard/news', icon: FiBell },
     { name: 'Events', href: '/dashboard/events', icon: FiCalendar },
     { name: 'About', href: '/about', icon: FiInfo },
     { name: 'Contact', href: '/contact', icon: FiMail },
@@ -203,8 +233,15 @@ export default function DashboardLayout({
                 target={item.external ? '_blank' : '_self'}
                 rel={item.external ? 'noopener noreferrer' : ''}
               >
-                <Icon className="mr-3 h-4 w-4" />
-                {item.label}
+                <div className="flex items-center">
+                  <Icon className="mr-3 h-4 w-4 flex-shrink-0" />
+                  <span className="text-sm flex-shrink-0">{item.label}</span>
+                  {item.name === 'News' && unreadNewsCount > 0 && (
+                    <span className="ml-2 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center flex-shrink-0">
+                      {unreadNewsCount > 99 ? '99+' : unreadNewsCount.toString()}
+                    </span>
+                  )}
+                </div>
               </Link>
             );
           })}

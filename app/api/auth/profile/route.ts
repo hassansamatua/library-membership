@@ -61,67 +61,52 @@ const toBoolean = (value: unknown) => {
 };
 
 const normalizeProfile = (row: any) => {
-  const personalInfoJson = parseJsonValue(row.personal_info) as any;
-  const contactInfoJson = parseJsonValue(row.contact_info) as any;
-  const educationJson = parseJsonValue(row.education) as any;
-  const employmentJson = parseJsonValue(row.employment) as any;
-  const membershipInfoJson = parseJsonValue(row.membership_info) as any;
-
-  const membershipFromInfo = membershipInfoJson?.membership || {};
-  const paymentFromInfo = membershipInfoJson?.payment || {};
-  const participationFromInfo = membershipInfoJson?.participation || {};
-  const documentsFromInfo = membershipInfoJson?.documents || {};
-
-  const degreeCertificates = row.degree_certificates_path
-    ? (parseJsonValue(row.degree_certificates_path) || row.degree_certificates_path)
-    : (documentsFromInfo?.degreeCertificates || documentsFromInfo?.degree_certificates || null);
-
   return {
     personalInfo: {
-      fullName: personalInfoJson?.fullName || personalInfoJson?.name || row.full_name || row.name || '',
-      dateOfBirth: row.date_of_birth || personalInfoJson?.dateOfBirth || personalInfoJson?.date_of_birth || '',
-      gender: row.gender || personalInfoJson?.gender || '',
-      placeOfBirth: row.place_of_birth || personalInfoJson?.placeOfBirth || personalInfoJson?.place_of_birth || '',
-      profilePicture: row.profile_picture || personalInfoJson?.profilePicture || personalInfoJson?.profile_picture || null,
-      nationality: row.nationality || personalInfoJson?.nationality || '',
-      idNumber: row.id_number || personalInfoJson?.idNumber || personalInfoJson?.id_number || ''
+      fullName: row.name || '',
+      dateOfBirth: row.date_of_birth || '',
+      gender: row.gender || '',
+      placeOfBirth: row.place_of_birth || '',
+      profilePicture: row.profile_picture || null,
+      nationality: row.nationality || '',
+      idNumber: row.id_number || ''
     },
     contactInfo: {
       email: row.email || '',
-      phone: row.phone || contactInfoJson?.phone || '',
-      address: row.address || contactInfoJson?.address || '',
-      city: row.city || contactInfoJson?.city || '',
-      country: row.country || contactInfoJson?.country || '',
-      postalCode: row.postal_code || contactInfoJson?.postalCode || contactInfoJson?.postal_code || ''
+      phone: row.phone_number || '',
+      address: row.address || '',
+      city: row.city || '',
+      country: row.country || '',
+      postalCode: row.postal_code || ''
     },
     professionalInfo: {
-      occupation: row.job_title || row.current_position || employmentJson?.occupation || employmentJson?.jobTitle || '',
-      company: row.employer_organization || row.industry || employmentJson?.company || '',
-      yearsOfExperience: String(row.years_experience ?? row.years_of_experience ?? employmentJson?.yearsOfExperience ?? ''),
-      specialization: employmentJson?.specialization || '',
+      occupation: row.job_title || row.current_position || '',
+      company: row.employer_organization || row.industry || '',
+      yearsOfExperience: String(row.years_experience || row.years_of_experience || ''),
+      specialization: row.specialization || '',
       skills: row.skills
         ? String(row.skills).split(',').map((s: string) => s.trim()).filter(Boolean)
-        : (Array.isArray(employmentJson?.skills) ? employmentJson.skills : [])
+        : []
     },
-    education: Array.isArray(educationJson) ? educationJson : [],
+    education: [],
     membership: {
-      membershipType: row.membership_type || membershipFromInfo?.membershipType || membershipFromInfo?.membership_type || '',
-      membershipNumber: row.membership_number || membershipFromInfo?.membershipNumber || membershipFromInfo?.membership_number || '',
-      membershipStatus: row.membership_status || membershipFromInfo?.membershipStatus || membershipFromInfo?.membership_status || '',
-      joinDate: row.join_date || membershipFromInfo?.joinDate || membershipFromInfo?.join_date || ''
+      membershipType: row.membership_type || '',
+      membershipNumber: row.membership_number || '',
+      membershipStatus: row.membership_status || '',
+      joinDate: row.join_date || ''
     },
     payment: {
-      paymentMethod: paymentFromInfo?.paymentMethod || paymentFromInfo?.payment_method || paymentFromInfo?.method || ''
+      paymentMethod: ''
     },
     participation: {
-      previousEvents: participationFromInfo?.previousEvents || participationFromInfo?.previous_events || [],
-      areasOfInterest: participationFromInfo?.areasOfInterest || participationFromInfo?.areas_of_interest || [],
-      volunteerInterest: toBoolean(participationFromInfo?.volunteerInterest ?? participationFromInfo?.volunteer_interest)
+      previousEvents: [],
+      areasOfInterest: [],
+      volunteerInterest: false
     },
     documents: {
-      idProof: row.id_proof_path || documentsFromInfo?.idProof || documentsFromInfo?.id_proof || null,
-      degreeCertificates,
-      cv: row.cv_path || documentsFromInfo?.cv || null
+      idProof: row.id_proof_path || null,
+      degreeCertificates: row.degree_certificates_path || null,
+      cv: row.cv_path || null
     }
   };
 };

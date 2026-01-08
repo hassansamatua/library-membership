@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     console.log('Login attempt for email:', email);
     
     // Get user from database
-    const [users] = await pool.query<import('@/lib/auth').User[]>(
+    const [users] = await pool.query<any[]>(
       'SELECT * FROM users WHERE email = ?',
       [email]
     );
