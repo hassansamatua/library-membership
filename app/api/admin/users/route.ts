@@ -2,18 +2,157 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { RowDataPacket } from 'mysql2/promise';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
 
 // Add this GET handler
-export async function GET() {
+export async function GET(request: Request) {
   let connection;
   try {
+    const authHeader = request.headers.get('authorization');
+    const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const cookieStore = await cookies();
+    const cookieToken = cookieStore.get('token')?.value;
+    const token = authToken || cookieToken;
+
+    if (!token) {
+      return NextResponse.json(
+        { message: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    let decoded;
+    try {
+      decoded = verifyToken(token);
+    } catch {
+      return NextResponse.json(
+        { message: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    if (!decoded?.isAdmin) {
+      return NextResponse.json(
+        { message: 'Admin access required' },
+        { status: 403 }
+      );
+    }
+
     connection = await pool.getConnection();
-    const [users] = await connection.query<RowDataPacket[]>(`
-      SELECT id, name, email, is_admin as isAdmin, is_approved as isApproved, created_at
-      FROM users
-      ORDER BY created_at DESC
-    `);
-    return NextResponse.json(users);
+    
+    // Get the status parameter from the URL
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status');
+    
+    let query = `
+      SELECT u.id, u.name, u.email, u.is_admin as isAdmin, u.is_approved as isApproved, 
+             u.created_at, u.updated_at,
+             up.phone, up.address, up.city, up.state, up.country, up.postal_code,
+             up.bio, up.profile_picture, up.cover_photo, up.company, up.job_title,
+             up.current_position, up.industry, up.years_of_experience, up.skills,
+             up.highest_degree, up.field_of_study, up.institution, up.year_of_graduation,
+             up.additional_certifications, up.areas_of_interest, up.id_proof_path,
+             up.degree_certificates_path, up.cv_path, up.website, up.twitter,
+             up.linkedin, up.github, up.facebook, up.instagram, up.date_of_birth,
+             up.gender, up.nationality, up.id_number, up.passport_number,
+             up.membership_number, up.membership_type, up.membership_status,
+             up.membership_expiry, up.join_date, up.personal_info, up.contact_info,
+             up.education, up.employment, up.membership_info,
+             up.professional_certifications, up.linkedin_profile
+      FROM users u
+      LEFT JOIN user_profiles up ON u.id = up.user_id
+    `;
+    
+    const params: any[] = [];
+    
+    if (status === 'pending') {
+      query += ' WHERE u.is_approved = 0 AND u.is_admin = 0';
+    } else if (status === 'approved') {
+      query += ' WHERE u.is_approved = 1 AND u.is_admin = 0';
+    } else if (status === 'all') {
+      // No additional filter - show all users including admins
+    } else if (status === 'non-admin') {
+      query += ' WHERE u.is_admin = 0';
+    } else {
+      // Default to all users (not pending) for general user management
+      // No additional filter
+    }
+    
+    query += ' ORDER BY u.created_at DESC';
+    
+    console.log('Users query:', query);
+    console.log('Query params:', params);
+    
+    const [users] = await connection.query<RowDataPacket[]>(query, params);
+    
+    console.log('Users fetched:', users.length);
+    console.log('Approval status breakdown:');
+    users.forEach((user: any, index: number) => {
+      console.log(`  User ${index + 1}: ${user.name} - is_approved: ${user.is_approved}, is_admin: ${user.is_admin}`);
+    });
+    
+    // Transform the data to include profile information
+    const transformedUsers = users.map(user => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      isAdmin: user.isAdmin,
+      isApproved: user.isApproved,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+      profile: {
+        phone: user.phone,
+        address: user.address,
+        city: user.city,
+        state: user.state,
+        country: user.country,
+        postalCode: user.postal_code,
+        bio: user.bio,
+        profilePicture: user.profile_picture,
+        coverPhoto: user.cover_photo,
+        company: user.company,
+        jobTitle: user.job_title,
+        currentPosition: user.current_position,
+        industry: user.industry,
+        yearsOfExperience: user.years_of_experience,
+        skills: user.skills,
+        highestDegree: user.highest_degree,
+        fieldOfStudy: user.field_of_study,
+        institution: user.institution,
+        yearOfGraduation: user.year_of_graduation,
+        additionalCertifications: user.additional_certifications,
+        areasOfInterest: user.areas_of_interest,
+        idProofPath: user.id_proof_path,
+        degreeCertificatesPath: user.degree_certificates_path,
+        cvPath: user.cv_path,
+        website: user.website,
+        twitter: user.twitter,
+        linkedin: user.linkedin,
+        github: user.github,
+        facebook: user.facebook,
+        instagram: user.instagram,
+        dateOfBirth: user.date_of_birth,
+        gender: user.gender,
+        nationality: user.nationality,
+        idNumber: user.id_number,
+        passportNumber: user.passport_number,
+        membershipNumber: user.membership_number,
+        membershipType: user.membership_type,
+        membershipStatus: user.membership_status,
+        membershipExpiry: user.membership_expiry,
+        joinDate: user.join_date,
+        personalInfo: user.personal_info,
+        contactInfo: user.contact_info,
+        education: user.education,
+        employment: user.employment,
+        membershipInfo: user.membership_info,
+        professionalCertifications: user.professional_certifications,
+        linkedinProfile: user.linkedin_profile
+      }
+    }));
+    
+    return NextResponse.json(transformedUsers);
   } catch (error) {
     console.error('Error fetching users:', error);
     return NextResponse.json(

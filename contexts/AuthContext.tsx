@@ -4,12 +4,20 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const toBoolean = (value: unknown) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') return value === '1' || value.toLowerCase() === 'true';
+  return false;
+};
+
 type User = {
   id: number;
   name: string;
   email: string;
   isAdmin: boolean;
   isApproved: boolean;
+  membershipNumber?: string | null;
 };
 
 export type UserProfile = {
@@ -70,7 +78,16 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ user: User | null; requiresApproval?: boolean; message?: string }>;
-  register: (name: string, email: string, password: string, nida: string, membershipType: 'personal' | 'organization', phoneNumber: string, organizationName: string | null) => Promise<void>;
+  register: (userData: {
+    name: string;
+    email: string;
+    password: string;
+    nida: string;
+    membershipType: 'personal' | 'organization';
+    phoneNumber: string;
+    organizationName?: string;
+    [key: string]: any; // Allow additional fields
+  }) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (profileData: Partial<UserProfile>) => Promise<void>;
 }
@@ -78,6 +95,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  console.log('[AuthProvider] AuthProvider component rendering...');
   const [user, setUser] = useState<(User & { profile?: Partial<UserProfile> }) | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
@@ -120,8 +138,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: data.user.id,
         name: data.user.name || data.user.username || '',
         email: data.user.email,
-        isAdmin: Boolean(data.user.is_admin || data.user.isAdmin || false),
-        isApproved: Boolean(data.user.is_approved !== false) // Default to true if not specified
+        isAdmin: toBoolean(data.user.is_admin ?? data.user.isAdmin ?? false),
+        isApproved: toBoolean(data.user.is_approved ?? data.user.isApproved ?? true)
       };
       
       console.log('[AuthContext] Login successful, user data:', {
@@ -133,6 +151,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Update the user state
       setUser(userData);
+
+      try {
+        const meRes = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
+        if (meRes.ok) {
+          const me = await meRes.json();
+          console.log('🔍 AuthContext - Received from /api/auth/me:', me);
+          console.log('🔍 AuthContext - me.membershipNumber:', me.membershipNumber);
+          const updatedUser = {
+            id: me.id,
+            name: me.name || '',
+            email: me.email,
+            isAdmin: toBoolean(me.isAdmin),
+            isApproved: toBoolean(me.isApproved),
+            membershipNumber: me.membershipNumber ?? null,
+            profile: me.profile || undefined
+          };
+          console.log('🔍 AuthContext - Setting user with membershipNumber:', updatedUser.membershipNumber);
+          setUser(updatedUser);
+          return { user: {
+            id: me.id,
+            name: me.name || '',
+            email: me.email,
+            isAdmin: toBoolean(me.isAdmin),
+            isApproved: toBoolean(me.isApproved),
+            membershipNumber: me.membershipNumber ?? null
+          } };
+        }
+      } catch {
+        // ignore
+      }
       
       // Return the normalized user data
       return { user: userData };
@@ -182,8 +230,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (name: string, email: string, password: string, nida: string, membershipType: 'personal' | 'organization', phoneNumber: string, organizationName: string | null) => {
+  const register = async (userData: {
+    name: string;
+    email: string;
+    password: string;
+    nida: string;
+    membershipType: 'personal' | 'organization';
+    phoneNumber: string;
+    organizationName?: string;
+    [key: string]: any;
+  }) => {
     try {
+      const { name, email, password, nida, membershipType, phoneNumber, organizationName, ...rest } = userData;
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -194,7 +252,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           nida, 
           membershipType, 
           phoneNumber, 
-          organizationName 
+          organizationName, 
+          ...rest 
         }),
       });
 
@@ -213,52 +272,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Check if user is logged in on initial load
   useEffect(() => {
-    const checkAuth = async () => {
-      console.log('[AuthContext] Checking authentication status...');
-      try {
-        const response = await fetch('/api/auth/me', { 
-          credentials: 'include',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          },
-          cache: 'no-store'
-        });
-
-        console.log('[AuthContext] Auth check response status:', response.status);
-
-        if (response.ok) {
-          const userData = await response.json();
-          const normalizedUser = {
-            id: userData.id,
-            name: userData.name || userData.username || '',
-            email: userData.email,
-            isAdmin: Boolean(userData.is_admin || userData.isAdmin || false),
-            isApproved: Boolean(userData.is_approved !== false)
-          };
-          
-          console.log('[AuthContext] User is authenticated:', {
-            id: normalizedUser.id,
-            email: normalizedUser.email,
-            isAdmin: normalizedUser.isAdmin,
-            isApproved: normalizedUser.isApproved
+    console.log('[AuthContext] useEffect triggered, checking auth...');
+    
+    // Simplified check to see if useEffect works at all
+    try {
+      console.log('[AuthContext] About to call checkAuth...');
+      
+      const checkAuth = async () => {
+        console.log('[AuthContext] Checking authentication status...');
+        try {
+          const response = await fetch('/api/auth/me', { 
+            credentials: 'include',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            },
+            cache: 'no-store'
           });
-          
-          setUser(normalizedUser);
-        } else {
-          console.log('[AuthContext] No active session found');
+
+          console.log('[AuthContext] Auth check response status:', response.status);
+
+          if (response.ok) {
+            const userData = await response.json();
+            console.log('[AuthContext] Raw user data from /api/auth/me:', userData);
+            
+            // Simplified user data for testing
+            const normalizedUser = {
+              id: userData.id,
+              name: userData.name || userData.username || '',
+              email: userData.email,
+              isAdmin: userData.isAdmin || userData.is_admin || false,
+              isApproved: userData.isAdmin ? true : (userData.isApproved || userData.is_approved || false),
+              membershipNumber: userData.membershipNumber ?? null,
+              profile: userData.profile || undefined
+            };
+            
+            console.log('[AuthContext] Setting user state:', normalizedUser);
+            setUser(normalizedUser);
+          } else {
+            console.log('[AuthContext] No active session found, status:', response.status);
+            const errorData = await response.text();
+            console.log('[AuthContext] Error response:', errorData);
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('[AuthContext] Error in checkAuth:', error);
           setUser(null);
         }
-      } catch (error) {
-        console.error('[AuthContext] Auth check failed:', error);
-        setUser(null);
-      } finally {
-        console.log('[AuthContext] Auth check completed');
+        
         setIsLoading(false);
-      }
-    };
+      };
 
-    checkAuth();
+      checkAuth();
+      console.log('[AuthContext] checkAuth called successfully');
+    } catch (error) {
+      console.error('[AuthContext] Error in useEffect:', error);
+      setIsLoading(false);
+    }
   }, []);
 
   const value = {

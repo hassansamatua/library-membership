@@ -1,125 +1,214 @@
+// app/api/users/[id]/approve/route.ts
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
-import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
-import { generateMembershipNumber } from '@/lib/membership';
+import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 interface User extends RowDataPacket {
   id: number;
+  is_approved: boolean;
   name: string;
   email: string;
-  is_approved: boolean;
-  membership_number: string | null;
-  created_at: Date;
+  membership_number?: string | null;
 }
 
 export async function PATCH(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
-  let connection;
+  const resolvedParams = await params;
+  return handleApproveUser(request, resolvedParams.id);
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const resolvedParams = await params;
+  return handleApproveUser(request, resolvedParams.id);
+}
+
+async function handleApproveUser(request: Request, userId: string) {
   try {
-    // Get the ID from the context params
-    const { id } = await Promise.resolve(context.params);
-    const userId = parseInt(id, 10);
-    
-    if (isNaN(userId)) {
+    console.log('Received request with user ID:', userId);
+    console.log('User ID from params:', userId);
+
+    const authHeader = request.headers.get('authorization');
+    const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const cookieStore = await cookies();
+    const cookieToken = cookieStore.get('token')?.value;
+    const token = authToken || cookieToken;
+
+    if (!token) {
       return NextResponse.json(
-        { message: 'Invalid user ID' },
+        { success: false, message: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    let decoded;
+    try {
+      decoded = verifyToken(token);
+    } catch {
+      return NextResponse.json(
+        { success: false, message: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    if (!decoded?.isAdmin) {
+      return NextResponse.json(
+        { success: false, message: 'Admin access required' },
+        { status: 403 }
+      );
+    }
+    
+    // Validate user ID
+    if (!userId || isNaN(Number(userId))) {
+      console.error('Invalid user ID:', userId);
+      return NextResponse.json(
+        { success: false, message: 'Invalid user ID' },
         { status: 400 }
       );
     }
 
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-
+    const connection = await pool.getConnection();
+    
     try {
-      // Check if user exists
-      const [users] = await connection.query<User[]>(
-        'SELECT * FROM users WHERE id = ? FOR UPDATE',
+      // First, check if user exists
+      const [rows] = await connection.query(
+        `SELECT u.id, u.is_approved, u.name, u.email, up.membership_number
+         FROM users u
+         LEFT JOIN user_profiles up ON u.id = up.user_id
+         WHERE u.id = ?`,
         [userId]
       );
+      const users = rows as User[];
 
-      if (users.length === 0) {
-        await connection.rollback();
+      if (!users || users.length === 0) {
         return NextResponse.json(
-          { message: 'User not found' },
+          { success: false, message: 'User not found' },
           { status: 404 }
         );
       }
 
       const user = users[0];
 
+      // If already approved, return success
       if (user.is_approved) {
-        await connection.rollback();
-        return NextResponse.json(
-          { 
-            message: 'User is already approved',
-            membership_number: user.membership_number
-          },
-          { status: 400 }
+        return NextResponse.json({
+          success: true,
+          message: 'User is already approved',
+          user: {
+            id: user.id,
+            isApproved: true
+          }
+        });
+      }
+
+      // Generate membership number if not exists
+      let membershipNumber = user.membership_number;
+      if (!membershipNumber) {
+        const year = new Date().getFullYear().toString().slice(-2); // Get last 2 digits
+        const randomNum = Math.floor(10000 + Math.random() * 90000); // 5-digit random number
+        membershipNumber = `TLA${year}${randomNum}`;
+        
+        // Store membership number in database
+        await connection.query(
+          'UPDATE user_profiles SET membership_number = ?, updated_at = NOW() WHERE user_id = ?',
+          [membershipNumber, userId]
         );
       }
 
-      // Generate and assign membership number
-      const membershipNumber = await generateMembershipNumber();
-      
-      // Update the user's approval status and set membership number
-      await connection.query<ResultSetHeader>(
-        'UPDATE users SET is_approved = TRUE, membership_number = ? WHERE id = ?',
-        [membershipNumber, userId]
+      // Update user approval status
+      const [result] = await connection.query<ResultSetHeader>(
+        'UPDATE users SET is_approved = TRUE, updated_at = NOW() WHERE id = ?',
+        [userId]
       );
 
-      // Commit the transaction
-      await connection.commit();
+      // Also update membership status to 'active' in user_profiles
+      await connection.query(
+        'UPDATE user_profiles SET membership_status = ?, updated_at = NOW() WHERE user_id = ?',
+        ['active', userId]
+      );
 
-      // Send approval email with membership number
+      // Get updated user data
+      const [updatedUsers] = await connection.query<User[]>(
+        `SELECT u.id, u.name, u.email, u.is_approved as isApproved, up.membership_number
+         FROM users u
+         LEFT JOIN user_profiles up ON u.id = up.user_id
+         WHERE u.id = ?`,
+        [userId]
+      );
+
       try {
-        const emailResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/send-approval-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: user.email,
-            name: user.name,
-            membershipNumber: membershipNumber
-          })
+        await resend.emails.send({
+          from: 'TLA <onboarding@resend.dev>',
+          to: updatedUsers[0].email,
+          subject: 'Your Account Has Been Approved!',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1 style="color: #111827; font-size: 24px; margin-bottom: 20px;">
+                Welcome, ${updatedUsers[0].name}!
+              </h1>
+              <p style="color: #374151; line-height: 1.6; margin-bottom: 20px;">
+                Your account has been approved. You can now log in.
+              </p>
+              ${updatedUsers[0].membership_number ? `
+              <div style="background-color: #F3F4F6; padding: 16px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; font-weight: 500; color: #111827;">Membership Number:</p>
+                <p style="font-size: 24px; font-weight: 700; color: #10B981; margin: 8px 0 0 0;">${updatedUsers[0].membership_number}</p>
+              </div>
+              ` : ''}
+              <div style="margin: 30px 0;">
+                <a 
+                  href="${process.env.NEXT_PUBLIC_APP_URL}/auth/login" 
+                  style="
+                    display: inline-block; 
+                    padding: 12px 24px; 
+                    background-color: #10B981; 
+                    color: white; 
+                    text-decoration: none; 
+                    border-radius: 6px;
+                    font-weight: 500;
+                    font-size: 16px;
+                  "
+                >
+                  Log In
+                </a>
+              </div>
+            </div>
+          `,
         });
-
-        if (!emailResponse.ok) {
-          console.error('Failed to send approval email');
-        }
       } catch (emailError) {
-        console.error('Error sending approval email:', emailError);
+        console.error('Failed to send approval email:', emailError);
       }
 
       return NextResponse.json({
         success: true,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          is_approved: true,
-          membership_number: membershipNumber,
-          created_at: user.created_at
-        }
+        message: 'User approved successfully',
+        user: updatedUsers[0]
       });
 
     } catch (error) {
-      await connection.rollback();
-      throw error;
+      console.error('Database error:', error);
+      return NextResponse.json(
+        { success: false, message: 'Database error' },
+        { status: 500 }
+      );
+    } finally {
+      connection.release();
     }
 
   } catch (error) {
-    console.error('Error in approve endpoint:', error);
+    console.error('Error approving user:', error);
     return NextResponse.json(
-      { 
-        message: error instanceof Error ? error.message : 'Internal server error',
-        success: false 
-      },
+      { success: false, message: 'Internal server error' },
       { status: 500 }
     );
-  } finally {
-    if (connection) connection.release();
   }
 }

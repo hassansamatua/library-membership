@@ -47,18 +47,18 @@ export function Modal({
       {...props}
     >
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 bg-black bg-opacity-50"
         onClick={onClose}
       />
       <div
-        className="relative z-50 w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"
+        className="relative z-50 w-full max-w-lg rounded-lg bg-white p-6 shadow-xl opacity-100"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-sm p-1 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="rounded-sm p-1 opacity-100 ring-offset-background transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             <X className="h-5 w-5" />
             <span className="sr-only">Close</span>

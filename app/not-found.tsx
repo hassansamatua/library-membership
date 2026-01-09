@@ -1,42 +1,65 @@
+"use client";
+
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { FiAlertTriangle, FiHome, FiArrowRight, FiArrowLeft } from 'react-icons/fi';
+import { useRouter } from 'next/navigation';
 
 export default function NotFound() {
+  const router = useRouter();
+
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/');
+    }
+  };
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-background to-muted/20 px-4">
-      <div className="text-center space-y-6 max-w-2xl mx-auto">
-        <div className="space-y-2">
-          <h1 className="text-9xl font-bold text-primary/80">404</h1>
-          <h2 className="text-4xl font-bold tracking-tight">Page Not Found</h2>
-          <p className="text-muted-foreground text-lg">
-            Oops! The page you're looking for doesn't exist or has been moved.
-          </p>
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 text-center">
+        <div className="flex justify-center">
+          <div className="w-24 h-24 rounded-full bg-red-100 flex items-center justify-center">
+            <FiAlertTriangle className="h-12 w-12 text-red-600" />
+          </div>
         </div>
         
-        <div className="relative h-64 w-full max-w-lg mx-auto my-8">
-          <div className="absolute inset-0 bg-muted rounded-full opacity-20 blur-3xl"></div>
-          <div className="relative h-full flex items-center justify-center">
-            <div className="text-9xl">🕵️‍♂️</div>
-          </div>
+        <h1 className="text-6xl font-bold text-gray-900">404</h1>
+        <h2 className="mt-2 text-3xl font-extrabold text-gray-900">Page Not Found</h2>
+        
+        <p className="mt-4 text-lg text-gray-600">
+          Oops! The page you're looking for doesn't exist or has been moved.
+        </p>
+        
+        <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+          <button 
+            onClick={handleGoBack}
+            className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200"
+          >
+            <FiArrowLeft className="mr-2 h-5 w-5" />
+            Go Back
+          </button>
+          
+          <Link 
+            href="/"
+            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition-colors duration-200"
+          >
+            <FiHome className="mr-2 h-5 w-5" />
+            Go to Homepage
+          </Link>
+          
+          <Link 
+            href="/contact"
+            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 transition-colors duration-200"
+          >
+            Contact Support
+            <FiArrowRight className="ml-2 h-5 w-5" />
+          </Link>
         </div>
-
-        <div className="space-y-4">
-          <p className="text-muted-foreground">
-            Let's get you back on track. Here are some helpful links:
-          </p>
-          <div className="flex flex-wrap justify-center gap-4 pt-4">
-            <Button asChild variant="default" size="lg">
-              <Link href="/">
-                Go to Homepage
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link href="/dashboard">
-                Dashboard
-              </Link>
-            </Button>
-          </div>
-        </div>
+        
+        <p className="mt-8 text-sm text-gray-500">
+          Or go back to <Link href="/" className="font-medium text-green-600 hover:text-green-500">our homepage</Link>
+        </p>
       </div>
     </div>
   );

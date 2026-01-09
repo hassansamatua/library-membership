@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
+import { RowDataPacket } from 'mysql2';
 
 export async function GET(request: Request) {
   try {
@@ -143,11 +144,11 @@ export async function GET(request: Request) {
         console.log('With params:', params);
         
         try {
-          const [rows] = await pool.query(query, params);
+          const [rows] = await pool.query<RowDataPacket[]>(query, params);
           console.log('Raw database results:', JSON.stringify(rows, null, 2));
           
           // Transform the rows to ensure proper JSON serialization
-          const formattedRows = rows.map((row: any) => {
+          const formattedRows = rows.map((row) => {
             const formattedRow: any = {};
             Object.entries(row).forEach(([key, value]) => {
               // Convert date objects to ISO strings
@@ -174,8 +175,9 @@ export async function GET(request: Request) {
           
         } catch (error) {
           console.error('Database query error:', error);
+          const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
           return NextResponse.json(
-            { error: 'Failed to execute database query', details: error.message },
+            { error: 'Failed to execute database query', details: errorMessage },
             { status: 500 }
           );
         }

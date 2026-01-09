@@ -1,264 +1,416 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'react-toastify';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, CreditCard, Banknote, Smartphone } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { FiCreditCard, FiCheckCircle, FiAlertCircle, FiLoader, FiArrowLeft, FiCalendar, FiTrendingUp } from 'react-icons/fi';
+import { calculateMembershipPricing, getMembershipStatus } from '@/lib/membership-pricing';
+import PaymentMethodSelector from '@/components/PaymentMethodSelector';
+import PhoneNumberInput from '@/components/PhoneNumberInput';
 
-// Payment method types
-type PaymentMethod = 'card' | 'mobile_money' | 'bank';
+const paymentMethods = [
+  { id: 'azampesa', displayName: 'AzamPesa' },
+  { id: 'mpesa', displayName: 'M-Pesa' },
+  { id: 'halopesa', displayName: 'HaloPesa' },
+  { id: 'airtelmoney', displayName: 'Airtel Money' },
+  { id: 'tigopesa', displayName: 'Tigo Pesa' },
+  { id: 'bankcard', displayName: 'Bank Card' }
+];
 
 export default function PaymentPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [amount, setAmount] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('mobile_money');
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const searchParams = useSearchParams();
+  const [loading, setLoading] = useState(true);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [membershipType, setMembershipType] = useState<'personal' | 'organization'>('personal');
+  const [pricing, setPricing] = useState<any>(null);
+  const [membershipStatus, setMembershipStatus] = useState<any>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
+  const [showPhoneInput, setShowPhoneInput] = useState(false);
+  const [userPhoneNumber, setUserPhoneNumber] = useState<string>('');
 
-  // Pre-fill phone number if available in user profile
+  // Auto-detect membership type from user profile
   useEffect(() => {
-    if (user?.profile?.contactInfo?.phone) {
-      setPhoneNumber(user.profile.contactInfo.phone);
-    }
-  }, [user]);
+    const fetchUserMembershipType = async () => {
+      try {
+        const response = await fetch('/api/membership/status', { credentials: 'include' });
+        const data = await response.json();
+        
+        if (data.success && data.plan) {
+          setMembershipType(data.plan.type);
+        }
+      } catch (error) {
+        console.error('Error fetching membership type:', error);
+        // Fallback to URL parameter or default to personal
+        const typeParam = searchParams.get('type');
+        setMembershipType(typeParam === 'organization' ? 'organization' : 'personal');
+      }
+    };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!amount || parseFloat(amount) <= 0) {
-      toast.error('Please enter a valid amount');
+    fetchUserMembershipType();
+  }, [searchParams]);
+
+  useEffect(() => {
+    // Check if user is logged in
+    if (!user) {
+      router.push('/login');
       return;
     }
-    
-    if (paymentMethod === 'mobile_money' && !phoneNumber) {
-      toast.error('Please enter your phone number');
+
+    // Calculate pricing and status
+    const calculatePricing = async () => {
+      try {
+        // Check if user is new or continuing
+        const response = await fetch('/api/membership/status', { credentials: 'include' });
+        const data = await response.json();
+        
+        // Better logic to determine if user is new
+        let isNewUser = true;
+        if (data.membership && data.membership.paymentStatus === 'paid') {
+          // User has a paid membership, check if it's for current year
+          const paymentYear = new Date(data.membership.payment_date).getFullYear();
+          const currentYear = new Date().getFullYear();
+          const membershipYear = currentYear - (new Date().getMonth() < 2 ? 1 : 0); // Membership year runs Feb-Jan
+          isNewUser = paymentYear !== membershipYear;
+        }
+        
+        console.log('User status:', { isNewUser, membership: data.membership });
+        
+        // Calculate pricing
+        const pricingData = calculateMembershipPricing(membershipType, isNewUser);
+        setPricing(pricingData);
+
+        // Get membership status
+        const lastPaymentDate = data.membership?.payment_date ? new Date(data.membership.payment_date) : null;
+        const statusData = getMembershipStatus(lastPaymentDate, membershipType, isNewUser);
+        setMembershipStatus(statusData);
+
+      } catch (error) {
+        console.error('Error calculating pricing:', error);
+        // Fallback pricing - assume new user
+        const fallbackPricing = calculateMembershipPricing(membershipType, true);
+        setPricing(fallbackPricing);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    calculatePricing();
+  }, [user, membershipType, router]);
+
+  const handlePayment = async () => {
+    if (!pricing || !user || !selectedPaymentMethod) {
+      setError('Please select a payment method');
       return;
     }
 
-    setIsLoading(true);
+    // Show phone number input instead of direct payment
+    setShowPhoneInput(true);
+  };
+
+  const handlePhoneNumberSubmit = async (phoneNumber: string) => {
+    if (!pricing || !user || !selectedPaymentMethod || !phoneNumber) {
+      setError('Missing payment information');
+      return;
+    }
+
+    setPaymentLoading(true);
+    setError(null);
+    setUserPhoneNumber(phoneNumber);
 
     try {
-      const response = await fetch('/api/payment/pesapal', {
+      // Use AzamPay checkout API with mobile money details - no PIN needed
+      const response = await fetch('/api/payments/azampay/checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          country_code: 'TZ',
-          amount: parseFloat(amount),
-          description: `Payment for ${user?.name || 'user'} (${user?.email || 'user'})`,
-          phoneNumber: phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`,
-          reference: `TLA-${Date.now()}-${user?.id || 'guest'}`,
+          membershipType,
+          amount: pricing.totalDue,
+          userId: user.id,
+          paymentMethod: selectedPaymentMethod,
+          phoneNumber: phoneNumber,
+          customerName: user.name,
+          customerEmail: user.email,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to initiate payment');
+        throw new Error(data.error || 'Failed to create payment');
       }
 
-      // Redirect to PesaPal payment page
-      setIsRedirecting(true);
-      window.location.href = data.payment_url;
-      
-    } catch (error) {
-      console.error('Payment error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to process payment. Please try again.');
-      setIsLoading(false);
+      // Handle fallback scenario
+      if (data.fallback) {
+        setPaymentUrl('fallback');
+        setError(data.error);
+        return;
+      }
+
+      // Redirect to AzamPay - this will trigger the mobile money prompt on user's phone
+      if (data.checkoutUrl) {
+        setPaymentUrl(data.checkoutUrl);
+        
+        // Show user message about phone prompt
+        setError(`Redirecting to AzamPay... Check your ${selectedPaymentMethod} app for payment confirmation.`);
+        
+        // Log provider integration details
+        console.log(`Payment initiated with ${selectedPaymentMethod}:`, {
+          provider: selectedPaymentMethod,
+          phone: phoneNumber,
+          amount: pricing.totalDue,
+          ussd: selectedPaymentMethod === 'mpesa' ? '*150*01#' :
+                selectedPaymentMethod === 'azampesa' ? '*150*01#' :
+                selectedPaymentMethod === 'halopesa' ? '*150*02#' :
+                selectedPaymentMethod === 'airtelmoney' ? '*150*03#' :
+                selectedPaymentMethod === 'tigopesa' ? '*150*04#' : '*150#'
+        });
+        
+        // Redirect after a short delay to show the message
+        setTimeout(() => {
+          window.location.href = data.checkoutUrl;
+        }, 2000);
+      } else {
+        throw new Error('No payment URL received');
+      }
+
+    } catch (err) {
+      console.error('Payment error:', err);
+      setError(err instanceof Error ? err.message : 'Payment failed');
+    } finally {
+      setPaymentLoading(false);
     }
   };
 
-  // Format amount to ensure it's a valid number
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^0-9.]/g, '');
-    setAmount(value);
+  const handlePhoneInputCancel = () => {
+    setShowPhoneInput(false);
+    setUserPhoneNumber('');
   };
 
-  if (isRedirecting) {
+  if (!user) {
     return (
-      <div className="container mx-auto px-4 py-16 max-w-2xl text-center">
-        <div className="flex flex-col items-center justify-center space-y-6">
-          <div className="p-4 rounded-full bg-muted">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight">Redirecting to PesaPal</h1>
-          <p className="text-muted-foreground text-lg">
-            Please wait while we securely connect you to PesaPal to complete your payment.
-          </p>
-        </div>
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-2xl mx-auto">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-primary/10">
-                <Banknote className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <CardTitle>Make a Payment</CardTitle>
-                <CardDescription>
-                  Securely complete your payment via PesaPal
-                </CardDescription>
+    <div className="min-h-screen bg-gray-100 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-8">
+          <button
+            onClick={() => showPhoneInput ? handlePhoneInputCancel() : router.push('/dashboard')}
+            className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          >
+            <FiArrowLeft className="mr-2" />
+            {showPhoneInput ? 'Back to Payment Methods' : 'Back to Dashboard'}
+          </button>
+          
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {showPhoneInput ? 'Confirm Payment' : 'Membership Payment'}
+          </h1>
+          <p className="text-gray-600">
+            {showPhoneInput 
+              ? `Complete your ${paymentMethods.find(m => m.id === selectedPaymentMethod)?.displayName} payment`
+              : `${membershipType === 'personal' ? 'Personal' : 'Organization'} Membership for ${pricing?.year}`
+            }
+          </p>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
+            <div className="flex">
+              <FiAlertCircle className="h-5 w-5 text-red-400 mt-0.5" />
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Payment Error</h3>
+                <p className="text-sm text-red-700 mt-1">{error}</p>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="amount">Amount (TSH)</Label>
-                  <div className="relative mt-1">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-muted-foreground">TSH</span>
+          </div>
+        )}
+
+        {/* Payment Loading */}
+        {paymentLoading && (
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="flex">
+              <FiLoader className="h-5 w-5 text-blue-400 animate-spin mt-0.5" />
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800">Processing Payment</h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  {showPhoneInput ? 'Securing your payment...' : 'Redirecting you to secure payment gateway...'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Phone Number Input Step */}
+        {showPhoneInput && selectedPaymentMethod && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <PhoneNumberInput
+              paymentMethod={selectedPaymentMethod}
+              onPhoneNumberSubmit={handlePhoneNumberSubmit}
+              onCancel={handlePhoneInputCancel}
+            />
+          </div>
+        )}
+
+        {/* Regular Payment Flow */}
+        {!showPhoneInput && (
+          <>
+            {/* Payment Method Selection */}
+            <PaymentMethodSelector
+              selectedMethod={selectedPaymentMethod}
+              onMethodSelect={setSelectedPaymentMethod}
+              amount={pricing?.totalDue || 0}
+            />
+
+            {/* Pricing Details */}
+            {pricing && (
+              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Details</h2>
+                
+                <div className="space-y-4">
+                  {/* Base Amount */}
+                  <div className="flex justify-between items-center py-3 border-b">
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {pricing.isNewUser ? 'New Member' : 'Continuing Member'} - {membershipType === 'personal' ? 'Personal' : 'Organization'}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Membership period: February {pricing.year} - January {pricing.year + 1}
+                      </p>
                     </div>
-                    <Input
-                      id="amount"
-                      type="text"
-                      inputMode="decimal"
-                      value={amount}
-                      onChange={handleAmountChange}
-                      placeholder="0.00"
-                      className="pl-12"
-                      required
-                    />
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Minimum amount: TSH 1,000
-                  </p>
-                </div>
-
-                <div>
-                  <Label>Payment Method</Label>
-                  <div className="mt-2 space-y-3">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('mobile_money')}
-                      className={`w-full flex items-center gap-3 p-4 border rounded-lg text-left transition-colors ${
-                        paymentMethod === 'mobile_money' 
-                          ? 'border-primary bg-primary/5' 
-                          : 'border-muted hover:border-primary/50'
-                      }`}
-                    >
-                      <div className={`p-2 rounded-full ${
-                        paymentMethod === 'mobile_money' 
-                          ? 'bg-primary/10 text-primary' 
-                          : 'bg-muted'
-                      }`}>
-                        <Smartphone className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Mobile Money</p>
-                        <p className="text-sm text-muted-foreground">M-Pesa, Airtel Money, etc.</p>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('card')}
-                      className={`w-full flex items-center gap-3 p-4 border rounded-lg text-left transition-colors ${
-                        paymentMethod === 'card' 
-                          ? 'border-primary bg-primary/5' 
-                          : 'border-muted hover:border-primary/50'
-                      }`}
-                    >
-                      <div className={`p-2 rounded-full ${
-                        paymentMethod === 'card' 
-                          ? 'bg-primary/10 text-primary' 
-                          : 'bg-muted'
-                      }`}>
-                        <CreditCard className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Credit/Debit Card</p>
-                        <p className="text-sm text-muted-foreground">Visa, Mastercard, etc.</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {paymentMethod === 'mobile_money' && (
-                  <div>
-                    <Label htmlFor="phoneNumber">Phone Number</Label>
-                    <div className="mt-1">
-                      <Select defaultValue="254">
-                        <SelectTrigger className="w-[120px] inline-flex mr-2">
-                          <SelectValue placeholder="Code" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="255">+255 (TZ)</SelectItem>
-                          <SelectItem value="254">+254 (KE)</SelectItem>
-                          <SelectItem value="256">+256 (UG)</SelectItem>
-                          <SelectItem value="250">+250 (RW)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        id="phoneNumber"
-                        type="tel"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
-                        placeholder="712 345 678"
-                        className="inline-flex w-[calc(100%-136px)]"
-                        required={paymentMethod === 'mobile_money'}
-                      />
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      You'll receive a payment request on this number
+                    <p className="text-xl font-bold text-gray-900">
+                      TZS {pricing.baseAmount.toLocaleString()}
                     </p>
+                  </div>
+
+                  {/* Penalty */}
+                  {pricing.penaltyAmount > 0 && (
+                    <div className="flex justify-between items-center py-3 border-b">
+                      <div>
+                        <p className="font-medium text-red-600">Late Payment Penalty</p>
+                        <p className="text-sm text-gray-600">
+                          {pricing.penaltyAmount / 10000} year(s) × TZS 10,000
+                        </p>
+                      </div>
+                      <p className="text-xl font-bold text-red-600">
+                        TZS {pricing.penaltyAmount.toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Total */}
+                  <div className="flex justify-between items-center py-3">
+                    <p className="text-lg font-semibold text-gray-900">Total Amount Due</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      TZS {pricing.totalDue.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Status Information */}
+                {membershipStatus && (
+                  <div className={`mt-4 p-4 rounded-lg ${
+                    membershipStatus.status === 'active' ? 'bg-green-50 border border-green-200' :
+                    membershipStatus.status === 'grace-period' ? 'bg-yellow-50 border border-yellow-200' :
+                    membershipStatus.status === 'overdue' ? 'bg-red-50 border border-red-200' :
+                    'bg-gray-50 border border-gray-200'
+                  }`}>
+                    <div className="flex items-center">
+                      <FiCalendar className="h-5 w-5 mr-2" />
+                      <div>
+                        <p className="font-medium capitalize">
+                          {membershipStatus.status.replace('-', ' ')}
+                        </p>
+                        {membershipStatus.status === 'grace-period' && (
+                          <p className="text-sm text-gray-600">
+                            {membershipStatus.daysUntilDue} days remaining until grace period ends
+                          </p>
+                        )}
+                        {membershipStatus.status === 'overdue' && (
+                          <p className="text-sm text-red-600">
+                            Payment is overdue. Penalty of TZS {membershipStatus.penaltyAmount.toLocaleString()} applies.
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
+            )}
 
-              <div className="pt-2">
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 text-base" 
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    `Pay TSH ${amount ? new Intl.NumberFormat('en-TZ').format(parseFloat(amount)) : '0'}`
-                  )}
-                </Button>
-                <p className="mt-3 text-center text-sm text-muted-foreground">
-                  By continuing, you agree to our{' '}
-                  <a href="/terms" className="text-primary hover:underline">Terms of Service</a> and{' '}
-                  <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a>.
-                </p>
+            {/* Payment Button */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <button
+                onClick={handlePayment}
+                disabled={paymentLoading || !pricing || !selectedPaymentMethod}
+                className="w-full flex items-center justify-center px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                {paymentLoading ? (
+                  <>
+                    <FiLoader className="animate-spin mr-2 h-5 w-5" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <FiCreditCard className="mr-2 h-5 w-5" />
+                    Pay TZS {pricing?.totalDue.toLocaleString() || '0'}
+                    {selectedPaymentMethod && ` with ${paymentMethods.find(m => m.id === selectedPaymentMethod)?.displayName}`}
+                  </>
+                )}
+              </button>
+
+              <div className="mt-4 text-center text-sm text-gray-600">
+                <p>Secure payment powered by AzamPay</p>
+                <p>You will be prompted to enter your mobile money details</p>
               </div>
-            </form>
-          </CardContent>
-          <CardFooter className="bg-muted/30 border-t p-4">
-            <div className="flex items-center justify-center w-full text-sm text-muted-foreground">
-              <div className="flex items-center gap-4">
-                <span>Secure payment by</span>
-                <div className="h-6 w-auto">
-                  <svg viewBox="0 0 200 50" className="h-full w-auto">
-                    <text x="0" y="30" fontFamily="Arial, sans-serif" fontSize="24" fontWeight="bold" fill="#1a1a1a">Pesa</text>
-                    <text x="75" y="30" fontFamily="Arial, sans-serif" fontSize="24" fontWeight="bold" fill="#00a651">Pal</text>
-                  </svg>
+            </div>
+
+            {/* Information Section */}
+            <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Membership Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">Payment Schedule</h4>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• Membership year: February to January</li>
+                    <li>• Grace period: Until March 31st</li>
+                    <li>• Late penalty: TZS 10,000 per year</li>
+                    <li>• New members: TZS 40,000 (Personal)</li>
+                    <li>• Continuing: TZS 30,000 (Personal)</li>
+                    <li>• Organization: TZS 150,000</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">Accepted Payment Methods</h4>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• Mobile Money (M-Pesa, Tigo Pesa, Airtel Money, HaloPesa)</li>
+                    <li>• Bank Cards (Visa, Mastercard)</li>
+                    <li>• Bank Transfer</li>
+                  </ul>
                 </div>
               </div>
             </div>
-          </CardFooter>
-        </Card>
+          </>
+        )}
       </div>
     </div>
   );

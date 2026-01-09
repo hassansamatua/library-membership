@@ -4,6 +4,13 @@ import { pool } from '@/lib/db';
 
 export async function POST() {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { message: 'Not found' },
+        { status: 404 }
+      );
+    }
+
     // Hardcoded admin credentials (for development only)
     const adminEmail = 'admin@example.com';
     const adminPassword = 'admin123';
