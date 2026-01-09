@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { RowDataPacket } from 'mysql2/promise';
-import { sendPasswordResetEmail } from '@/lib/email-config';
+import { sendPasswordResetEmail } from '@/lib/email-simple';
 
 // POST - Send reset code
 export async function POST(request: Request) {
