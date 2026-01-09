@@ -163,10 +163,9 @@ export async function POST(request: Request) {
             u.email,
             p.transaction_id,
             p.amount,
-            p.payment_method,
+            COALESCE(p.payment_method, 'Unknown') as payment_method,
             p.status,
             p.created_at as payment_date,
-            p.description,
             p.created_at
           FROM payments p
           LEFT JOIN users u ON p.user_id = u.id
@@ -278,10 +277,12 @@ export async function POST(request: Request) {
     
     return NextResponse.json({
       success: true,
+      message: 'Report generated successfully',
       data: results,
       generatedAt: new Date().toISOString(),
       reportType,
-      dateRange: { startDate, endDate }
+      dateRange: { startDate, endDate },
+      recordCount: results.length
     });
 
   } catch (error) {

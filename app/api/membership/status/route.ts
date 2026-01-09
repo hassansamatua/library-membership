@@ -8,7 +8,7 @@ type MembershipRow = RowDataPacket & {
   id: number;
   user_id: number;
   membership_number: string;
-  membership_type: 'individual' | 'organization' | 'student';
+  membership_type: 'personal' | 'organization';
   status: 'active' | 'expired' | 'suspended' | 'pending';
   joined_date: string;
   expiry_date: string;
@@ -119,7 +119,7 @@ export async function GET(request: Request) {
     const userProfile = profileRows[0] || {};
     const hasProfilePicture = Boolean(userProfile.profile_picture && userProfile.profile_picture !== '' && userProfile.profile_picture !== null);
 
-    const active = Boolean(membership?.status === 'active' && activeByDate && paid && hasProfilePicture);
+    const active = Boolean(membership?.status === 'active' && activeByDate && paid);
 
     const effectiveFees = active
       ? { baseAmount: 0, penaltyAmount: 0, totalDue: 0, currency: 'TZS' }

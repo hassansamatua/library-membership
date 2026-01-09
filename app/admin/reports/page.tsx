@@ -150,16 +150,23 @@ export default function AdminReportsPage() {
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to generate report');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error Response:', errorData);
+        throw new Error(errorData.message || `HTTP ${response.status}: Failed to generate report`);
+      }
 
       const data = await response.json();
+      
+      console.log('Report generation response:', data);
       
       if (data.success && data.data) {
         setReportData(data.data);
         setShowDataModal(true);
-        toast.success('Report generated successfully');
+        toast.success(`Report generated successfully - ${data.recordCount || data.data.length} records found`);
       } else {
-        throw new Error('No data returned');
+        console.error('Report generation failed:', data);
+        throw new Error(data.message || 'No data returned from report generation');
       }
       
       setShowGenerateModal(false);

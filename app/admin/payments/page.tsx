@@ -75,7 +75,7 @@ export default function AdminPaymentsPage() {
       if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
       if (filters.dateTo) params.append('dateTo', filters.dateTo);
       
-      const response = await fetch(`/api/admin/payments?${params.toString()}`, { credentials: 'include' });
+      const response = await fetch(`/api/admin/payments/list?${params.toString()}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch payments');
       const data = await response.json();
       setPayments(data);
@@ -129,7 +129,7 @@ export default function AdminPaymentsPage() {
       if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
       if (filters.dateTo) params.append('dateTo', filters.dateTo);
       
-      const response = await fetch(`/api/admin/payments/export?${params.toString()}`, { credentials: 'include' });
+      const response = await fetch(`/api/admin/payments/list/export?${params.toString()}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to export payments');
       
       const blob = await response.blob();
@@ -309,9 +309,8 @@ export default function AdminPaymentsPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
               >
                 <option value="">All Types</option>
-                <option value="individual">Individual</option>
+                <option value="personal">Personal</option>
                 <option value="organization">Organization</option>
-                <option value="student">Student</option>
               </select>
             </div>
             <div>

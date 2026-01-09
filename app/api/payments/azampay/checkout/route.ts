@@ -127,6 +127,14 @@ export async function POST(request: NextRequest) {
         
         // Update payment status to completed
         const { updateMembershipPayment } = await import('@/lib/membership');
+        console.log('Updating membership payment with:', {
+          reference: checkoutResponse.data.reference,
+          transactionId: checkoutResponse.data.transactionId,
+          amount,
+          paymentMethod: 'Test Payment',
+          status: 'completed',
+          paidAt: new Date(),
+        });
         await updateMembershipPayment({
           reference: checkoutResponse.data.reference,
           transactionId: checkoutResponse.data.transactionId,
@@ -135,6 +143,7 @@ export async function POST(request: NextRequest) {
           status: 'completed',
           paidAt: new Date(),
         });
+        console.log('Membership payment updated successfully');
 
         return NextResponse.json({
           success: true,
