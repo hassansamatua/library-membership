@@ -6,7 +6,58 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
+// Helper function to send email safely
+async function sendApprovalEmail(email: string, name: string, membershipNumber?: string) {
+  if (!resend) {
+    console.log('Resend API key not configured, skipping email sending');
+    return;
+  }
+  
+  try {
+    await resend.emails.send({
+      from: 'TLA <onboarding@resend.dev>',
+      to: email,
+      subject: 'Your Account Has Been Approved!',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #111827; font-size: 24px; margin-bottom: 20px;">
+            Welcome, ${name}!
+          </h1>
+          <p style="color: #374151; line-height: 1.6; margin-bottom: 20px;">
+            Your account has been approved. You can now log in.
+          </p>
+          ${membershipNumber ? `
+          <div style="background-color: #F3F4F6; padding: 16px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; font-weight: 500; color: #111827;">Membership Number:</p>
+            <p style="font-size: 24px; font-weight: 700; color: #10B981; margin: 8px 0 0 0;">${membershipNumber}</p>
+          </div>
+          ` : ''}
+          <div style="margin: 30px 0;">
+            <a 
+              href="${process.env.NEXT_PUBLIC_APP_URL}/auth/login" 
+              style="
+                display: inline-block; 
+                padding: 12px 24px; 
+                background-color: #10B981; 
+                color: white; 
+                text-decoration: none; 
+                border-radius: 6px;
+                font-weight: 500;
+                font-size: 16px;
+              "
+            >
+              Log In
+            </a>
+          </div>
+        </div>
+      `,
+    });
+  } catch (emailError) {
+    console.error('Failed to send approval email:', emailError);
+  }
+}
 
 interface User extends RowDataPacket {
   id: number;
@@ -145,48 +196,8 @@ async function handleApproveUser(request: Request, userId: string) {
         [userId]
       );
 
-      try {
-        await resend.emails.send({
-          from: 'TLA <onboarding@resend.dev>',
-          to: updatedUsers[0].email,
-          subject: 'Your Account Has Been Approved!',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h1 style="color: #111827; font-size: 24px; margin-bottom: 20px;">
-                Welcome, ${updatedUsers[0].name}!
-              </h1>
-              <p style="color: #374151; line-height: 1.6; margin-bottom: 20px;">
-                Your account has been approved. You can now log in.
-              </p>
-              ${updatedUsers[0].membership_number ? `
-              <div style="background-color: #F3F4F6; padding: 16px; border-radius: 8px; margin: 20px 0;">
-                <p style="margin: 0; font-weight: 500; color: #111827;">Membership Number:</p>
-                <p style="font-size: 24px; font-weight: 700; color: #10B981; margin: 8px 0 0 0;">${updatedUsers[0].membership_number}</p>
-              </div>
-              ` : ''}
-              <div style="margin: 30px 0;">
-                <a 
-                  href="${process.env.NEXT_PUBLIC_APP_URL}/auth/login" 
-                  style="
-                    display: inline-block; 
-                    padding: 12px 24px; 
-                    background-color: #10B981; 
-                    color: white; 
-                    text-decoration: none; 
-                    border-radius: 6px;
-                    font-weight: 500;
-                    font-size: 16px;
-                  "
-                >
-                  Log In
-                </a>
-              </div>
-            </div>
-          `,
-        });
-      } catch (emailError) {
-        console.error('Failed to send approval email:', emailError);
-      }
+      // Send approval email
+      await sendApprovalEmail(updatedUsers[0].email, updatedUsers[0].name, updatedUsers[0].membership_number || undefined);
 
       return NextResponse.json({
         success: true,
