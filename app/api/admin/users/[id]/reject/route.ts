@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 interface User extends RowDataPacket {
   id: number;
