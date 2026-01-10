@@ -110,7 +110,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
   const handleApprove = async () => {
     try {
-      const response = await fetch(`/api/admin/users/${resolvedParams.id}/approve`, {
+const response = await fetch(`/api/admin/users/${resolvedParams.id}/approve`, {
         method: 'POST',
         credentials: 'include'
       });
@@ -127,7 +127,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     if (!confirm('Are you sure you want to reject this user?')) return;
     
     try {
-      const response = await fetch(`/api/admin/users/${resolvedParams.id}/reject`, {
+const response = await fetch(`/api/admin/users/${resolvedParams.id}/reject`, {
         method: 'POST',
         credentials: 'include'
       });

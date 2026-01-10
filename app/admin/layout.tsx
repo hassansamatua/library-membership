@@ -66,6 +66,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const menuItems = [
     { name: 'Dashboard', href: '/admin', icon: FiHome },
     { name: 'Member Management', href: '/admin/users', icon: FiUsers },
+    { name: 'Card Management', href: '/admin/cards', icon: FiCreditCard },
     { name: 'News', href: '/admin/news', icon: FiBell },
     { name: 'Content Management', href: '/admin/content', icon: FiFile },
     { name: 'Events', href: '/admin/events', icon: FiCalendar },
