@@ -32,6 +32,8 @@ export default function MembershipCardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [downloadInProgress, setDownloadInProgress] = useState(false);
+  const [printInProgress, setPrintInProgress] = useState(false);
 
   const loadMembershipStatus = async () => {
     try {
@@ -61,11 +63,24 @@ export default function MembershipCardPage() {
   }, [refreshKey]);
 
   const handleDownload = () => {
+    // Prevent multiple downloads
+    if (downloadInProgress) {
+      console.log('⚠️ Download already in progress, ignoring...');
+      return;
+    }
+    setDownloadInProgress(true);
+    
+    console.log('🎨 Starting card download...');
     // Create a canvas element to generate the card as an image
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.error('❌ Failed to get canvas context');
+      setDownloadInProgress(false);
+      return;
+    }
 
+    console.log('✅ Canvas context created');
     // Set canvas size (credit card dimensions: 85.6mm × 53.98mm)
     canvas.width = 856; // 10x scale for better quality
     canvas.height = 540;
@@ -119,6 +134,12 @@ export default function MembershipCardPage() {
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
+    // Load all images before drawing
+    let logoLoaded = false;
+    let profileLoaded = true; // Default to true if no profile image
+    let logoError = false;
+    let profileError = false;
+
     // Create clipping path for circular logo
     ctx.save();
     ctx.beginPath();
@@ -126,36 +147,60 @@ export default function MembershipCardPage() {
     ctx.clip();
 
     // Draw actual logo image if available
+    console.log('🖼️ Starting logo load...');
     const logoImg = new Image();
+    // Set crossOrigin to handle potential CORS issues
+    logoImg.crossOrigin = 'anonymous';
     logoImg.onload = () => {
+      console.log('✅ Logo loaded successfully');
       ctx.drawImage(logoImg, 32, 16, 80, 80);
       ctx.restore();
-      drawCardContent();
+      logoLoaded = true;
+      loadProfileImage();
     };
     logoImg.onerror = () => {
-      // Fallback to text logo
-      ctx.fillStyle = '#15803d';
-      ctx.font = 'bold 40px Arial';
+      console.warn('⚠️ Logo image failed to load, using fallback');
+      // Fallback to text logo with circular background
+      ctx.fillStyle = 'white';
+      ctx.beginPath();
+      ctx.arc(72, 56, 40, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#059669';
+      ctx.font = 'bold 32px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('TLA', 72, 56);
       ctx.restore();
-      drawCardContent();
+      logoError = true;
+      loadProfileImage();
     };
+    
+    // Add timeout to handle slow loading
+    setTimeout(() => {
+      if (!logoLoaded && !logoError) {
+        console.warn('Logo image loading timeout, using fallback');
+        // Manually trigger the error handler
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(72, 56, 40, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#059669';
+        ctx.font = 'bold 32px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('TLA', 72, 56);
+        ctx.restore();
+        logoError = true;
+        loadProfileImage();
+      }
+    }, 3000);
+    
     logoImg.src = '/logo.png';
 
-    function drawCardContent() {
-      // Draw organization name - exact positioning and colors
-      ctx.fillStyle = 'white';
-      ctx.font = 'bold 32px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('Tanzania Library and', canvas.width / 2, 64);
-      ctx.fillText('Information Association', canvas.width / 2, 96);
-      
-      ctx.font = '24px Arial';
-      ctx.fillStyle = '#bbf7d0'; // green-100 (exact match)
-      ctx.fillText('(TLA)', canvas.width / 2, 124);
-
+    function loadProfileImage() {
+      console.log('👤 Starting profile image load...');
       // Draw profile picture background - exact white
       ctx.fillStyle = 'white';
       ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
@@ -177,13 +222,48 @@ export default function MembershipCardPage() {
 
       // Draw profile picture image if available
       if (user?.profile?.personalInfo?.profilePicture) {
+        console.log('📸 User has profile picture:', user.profile.personalInfo.profilePicture);
+        profileLoaded = false; // Set to false since we're loading an image
         const profileImg = new Image();
+        profileImg.crossOrigin = 'anonymous';
         profileImg.onload = () => {
+          console.log('✅ Profile image loaded successfully');
           ctx.drawImage(profileImg, canvas.width - 120, 40, 80, 80);
           ctx.restore();
+          profileLoaded = true;
+          checkAllImagesLoaded();
         };
+        profileImg.onerror = () => {
+          console.warn('⚠️ Profile image failed to load, using fallback');
+          // Fallback to initial if image fails to load
+          ctx.fillStyle = '#4ade80'; // green-400 (exact match)
+          ctx.font = 'bold 40px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(user?.name?.charAt(0)?.toUpperCase() || 'M', canvas.width - 80, 80);
+          ctx.restore();
+          profileError = true;
+          checkAllImagesLoaded();
+        };
+        
+        // Add timeout for profile image
+        setTimeout(() => {
+          if (!profileLoaded && !profileError) {
+            console.warn('Profile image loading timeout, using fallback');
+            ctx.fillStyle = '#4ade80';
+            ctx.font = 'bold 40px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(user?.name?.charAt(0)?.toUpperCase() || 'M', canvas.width - 80, 80);
+            ctx.restore();
+            profileError = true;
+            checkAllImagesLoaded();
+          }
+        }, 3000);
+        
         profileImg.src = user.profile.personalInfo.profilePicture;
       } else {
+        console.log('📝 No profile picture, using initial');
         // Draw profile picture or initial - exact colors
         ctx.fillStyle = '#4ade80'; // green-400 (exact match)
         ctx.font = 'bold 40px Arial';
@@ -191,7 +271,31 @@ export default function MembershipCardPage() {
         ctx.textBaseline = 'middle';
         ctx.fillText(user?.name?.charAt(0)?.toUpperCase() || 'M', canvas.width - 80, 80);
         ctx.restore();
+        checkAllImagesLoaded();
       }
+    }
+
+    function checkAllImagesLoaded() {
+      console.log('🔄 Checking images loaded:', { logoLoaded, logoError, profileLoaded, profileError });
+      if ((logoLoaded || logoError) && (profileLoaded || profileError)) {
+        console.log('🎨 All images processed, drawing content...');
+        drawCardContent();
+      }
+    }
+
+    function drawCardContent() {
+      if (!ctx) return;
+      
+      // Draw organization name - exact positioning and colors
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 32px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Tanzania Library and', canvas.width / 2, 64);
+      ctx.fillText('Information Association', canvas.width / 2, 96);
+      
+      ctx.font = '24px Arial';
+      ctx.fillStyle = '#bbf7d0'; // green-100 (exact match)
+      ctx.fillText('(TLA)', canvas.width / 2, 124);
 
       // Draw member name section - exact positioning
       ctx.fillStyle = '#bbf7d0'; // green-100 (exact match)
@@ -259,24 +363,39 @@ export default function MembershipCardPage() {
       ctx.globalAlpha = 1;
 
       // Convert to image and download
+      console.log('💾 Converting canvas to image...');
       canvas.toBlob((blob) => {
         if (blob) {
+          console.log('✅ Image blob created, starting download...');
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
           a.download = `membership-card-${user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'member'}.png`;
           a.click();
           URL.revokeObjectURL(url);
+          console.log('🎉 Download completed!');
+        } else {
+          console.error('❌ Failed to create image blob');
         }
+        // Reset the guard after completion
+        setDownloadInProgress(false);
       }, 'image/png', 1.0);
     }
   };
 
   const handlePrint = () => {
+    // Prevent multiple prints
+    if (printInProgress) {
+      console.log('⚠️ Print already in progress, ignoring...');
+      return;
+    }
+    setPrintInProgress(true);
+    
     // Create a print-specific version with SVG for better color preservation
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert('Please allow popups for printing');
+      setPrintInProgress(false);
       return;
     }
 
@@ -371,24 +490,23 @@ export default function MembershipCardPage() {
             <rect width="336" height="50" fill="rgba(16, 185, 129, 0.2)" rx="16" ry="16"/>
             
             <!-- TLA Logo and name header -->
-            <text x="16" y="28" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#10b981" letter-spacing="2">TANZANIA LIBRARY</text>
-            <text x="250" y="32" font-family="Arial, sans-serif" font-size="14" font-weight="900" fill="#10b981" text-anchor="end">TLA</text>
+            <!-- Logo background - circular with white -->
+            <circle cx="36" cy="28" r="20" fill="white" stroke="rgba(16, 185, 129, 0.3)" stroke-width="2"/>
+            <text x="36" y="28" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#059669" text-anchor="middle" dominant-baseline="middle">TLA</text>
             
-            <!-- Chip icon area (left side) -->
+            <!-- Organization name -->
+            <text x="168" y="32" font-family="Arial" font-size="12" font-weight="900" fill="white" text-anchor="middle">Tanzania Library and</text>
+            <text x="168" y="48" font-family="Arial" font-size="12" font-weight="900" fill="white" text-anchor="middle">Information Association</text>
+            <text x="168" y="62" font-family="Arial" font-size="10" fill="#10b981" text-anchor="middle" font-weight="600">(TLA)</text>
+            
+            <!-- Profile picture with proper fallback -->
             <g>
-              <rect x="16" y="68" width="38" height="32" fill="rgba(255, 255, 255, 0.1)" stroke="rgba(16, 185, 129, 0.3)" stroke-width="1.5" rx="4" ry="4"/>
-              <!-- Chip pattern -->
-              <circle cx="24" cy="76" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
-              <circle cx="32" cy="76" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
-              <circle cx="40" cy="76" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
-              <circle cx="24" cy="84" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
-              <circle cx="32" cy="84" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
-              <circle cx="40" cy="84" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
-              <circle cx="24" cy="92" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
-              <circle cx="32" cy="92" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
-              <circle cx="40" cy="92" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
+              <!-- Profile background circle -->
+              <circle cx="296" cy="32" r="20" fill="rgba(16, 185, 129, 0.1)" stroke="rgba(16, 185, 129, 0.4)" stroke-width="2"/>
+              <circle cx="296" cy="32" r="19" fill="url(#greenAccent)" stroke="white" stroke-width="1.5"/>
+              <!-- Profile initial or image placeholder -->
+              <text x="296" y="32" font-family="Arial" font-size="20" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">${user?.name?.charAt(0)?.toUpperCase() || 'M'}</text>
             </g>
-            
             <!-- Member name section -->
             <text x="70" y="75" font-family="Arial, sans-serif" font-size="8" fill="#10b981" font-weight="700" letter-spacing="1">MEMBER NAME</text>
             <text x="70" y="92" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">${user?.name?.substring(0, 20) || 'Member Name'}</text>
@@ -440,6 +558,20 @@ export default function MembershipCardPage() {
 
     printWindow.document.write(printContent);
     printWindow.document.close();
+    
+    // Reset the guard when print window closes
+    const checkClosed = setInterval(() => {
+      if (printWindow.closed) {
+        clearInterval(checkClosed);
+        setPrintInProgress(false);
+        console.log('🖨️ Print window closed');
+      }
+    }, 1000);
+    
+    // Also reset after 10 seconds as fallback
+    setTimeout(() => {
+      setPrintInProgress(false);
+    }, 10000);
   };
 
   const handleShare = async () => {
@@ -542,10 +674,16 @@ export default function MembershipCardPage() {
           }
           
           /* Ensure card maintains exact colors when printed */
-          .card-gradient {
-            background: linear-gradient(135deg, #15803d 0%, #16a34a 50%, #166534 100%) !important;
+          .membership-card svg {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          
+          .membership-card svg * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
           }
           
           .card-text-white {
@@ -634,6 +772,16 @@ export default function MembershipCardPage() {
             image-rendering: crisp-edges;
             image-rendering: pixelated;
           }
+          
+          /* Ensure SVG elements print correctly */
+          .membership-card svg rect,
+          .membership-card svg circle,
+          .membership-card svg polygon,
+          .membership-card svg text {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
         }
       `}</style>
       
@@ -710,10 +858,14 @@ export default function MembershipCardPage() {
                   <text x="168" y="48" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">Information Association</text>
                   <text x="168" y="62" fontFamily="Arial" fontSize="10" fill="#10b981" textAnchor="middle" fontWeight="600">(TLA)</text>
                   
-                  {/* Profile picture - circular with green */}
-                  <circle cx="296" cy="32" r="20" fill="rgba(16, 185, 129, 0.1)" stroke="rgba(16, 185, 129, 0.4)" strokeWidth="2"/>
-                  <circle cx="296" cy="32" r="19" fill="url(#greenAccent)" stroke="white" strokeWidth="1.5"/>
-                  <text x="296" y="32" fontFamily="Arial" fontSize="20" fontWeight="bold" fill="white" textAnchor="middle" dominantBaseline="middle">{user?.name?.charAt(0)?.toUpperCase() || 'M'}</text>
+                  {/* Profile picture with proper fallback */}
+                  <g>
+                    {/* Profile background circle */}
+                    <circle cx="296" cy="32" r="20" fill="rgba(16, 185, 129, 0.1)" stroke="rgba(16, 185, 129, 0.4)" strokeWidth="2"/>
+                    <circle cx="296" cy="32" r="19" fill="url(#greenAccent)" stroke="white" strokeWidth="1.5"/>
+                    {/* Profile initial or image placeholder */}
+                    <text x="296" y="32" fontFamily="Arial" fontSize="20" fontWeight="bold" fill="white" textAnchor="middle" dominantBaseline="middle">{user?.name?.charAt(0)?.toUpperCase() || 'M'}</text>
+                  </g>
                   
                   {/* Member name section */}
                   <text x="70" y="75" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="1">MEMBER NAME</text>
@@ -745,18 +897,20 @@ export default function MembershipCardPage() {
               <div className="mt-6 flex flex-wrap gap-3 justify-center card-actions">
                 <button
                   onClick={handleDownload}
-                  className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                  disabled={downloadInProgress}
+                  className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FiDownload className="mr-2 h-4 w-4" />
-                  Download Card
+                  {downloadInProgress ? 'Downloading...' : 'Download Card'}
                 </button>
                 
                 <button
                   onClick={handlePrint}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  disabled={printInProgress}
+                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FiPrinter className="mr-2 h-4 w-4" />
-                  Print Card
+                  {printInProgress ? 'Printing...' : 'Print Card'}
                 </button>
                 
                 <button
