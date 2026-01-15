@@ -327,77 +327,99 @@ export default function MembershipCardPage() {
       </head>
       <body>
         <div class="card-container">
-          <svg width="336" height="212" xmlns="http://www.w3.org/2000/svg" style="border-radius: 12px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
-            <!-- Background with gradient -->
+          <svg width="336" height="212" xmlns="http://www.w3.org/2000/svg" style="border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3), 0 10px 15px -5px rgba(0, 0, 0, 0.2);">
+            <!-- Gradients and patterns -->
             <defs>
+              <!-- Main gradient: Gray to dark gray -->
               <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:#15803d;stop-opacity:1" />
-                <stop offset="50%" style="stop-color:#16a34a;stop-opacity:1" />
-                <stop offset="100%" style="stop-color:#166534;stop-opacity:1" />
+                <stop offset="0%" style="stop-color:#2d3e50;stop-opacity:1" />
+                <stop offset="50%" style="stop-color:#34495e;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#1a252f;stop-opacity:1" />
               </linearGradient>
-              <linearGradient id="stripGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" style="stop-color:#14532d;stop-opacity:0.8" />
-                <stop offset="100%" style="stop-color:#052e16;stop-opacity:0.8" />
+              
+              <!-- Green accent gradient -->
+              <linearGradient id="greenAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
               </linearGradient>
-              <linearGradient id="profileGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:#4ade80;stop-opacity:1" />
-                <stop offset="100%" style="stop-color:#22c55e;stop-opacity:1" />
+              
+              <!-- Diagonal stripe pattern -->
+              <pattern id="diagonalPattern" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="60" stroke="rgba(16, 185, 129, 0.08)" stroke-width="20"/>
+              </pattern>
+              
+              <!-- Semi-transparent overlay for depth -->
+              <linearGradient id="overlay" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:rgba(16, 185, 129, 0.1);stop-opacity:1" />
+                <stop offset="100%" style="stop-color:rgba(16, 185, 129, 0.05);stop-opacity:1" />
               </linearGradient>
             </defs>
             
             <!-- Main background -->
-            <rect width="336" height="212" fill="url(#bgGradient)" rx="12" ry="12"/>
+            <rect width="336" height="212" fill="url(#bgGradient)" rx="16" ry="16"/>
             
-            <!-- Background pattern with blur -->
-            <defs>
-              <filter id="blur1">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="3"/>
-              </filter>
-              <filter id="blur2">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
-              </filter>
-              <filter id="blur3">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="4"/>
-              </filter>
-            </defs>
-            <circle cx="276" cy="52" r="40" fill="white" opacity="0.15" filter="url(#blur1)"/>
-            <circle cx="60" cy="160" r="30" fill="white" opacity="0.12" filter="url(#blur2)"/>
-            <circle cx="168" cy="106" r="50" fill="white" opacity="0.08" filter="url(#blur3)"/>
+            <!-- Diagonal pattern overlay -->
+            <rect width="336" height="212" fill="url(#diagonalPattern)" rx="16" ry="16"/>
             
-            <!-- Logo background - circular -->
-            <circle cx="36" cy="28" r="20" fill="white" stroke="none"/>
-            <text x="36" y="28" font-family="Arial" font-size="20" font-weight="bold" fill="#15803d" text-anchor="middle" dominant-baseline="middle">TLA</text>
+            <!-- Green accent overlay for depth -->
+            <rect width="336" height="212" fill="url(#overlay)" rx="16" ry="16"/>
             
-            <!-- Organization name -->
-            <text x="168" y="32" font-family="Arial" font-size="12" font-weight="bold" fill="white" text-anchor="middle">Tanzania Library and</text>
-            <text x="168" y="48" font-family="Arial" font-size="12" font-weight="bold" fill="white" text-anchor="middle">Information Association</text>
-            <text x="168" y="62" font-family="Arial" font-size="12" fill="#bbf7d0" text-anchor="middle">(TLA)</text>
+            <!-- Large diagonal green stripe (top right) -->
+            <polygon points="200,0 336,0 336,150 150,0" fill="rgba(16, 185, 129, 0.15)"/>
             
-            <!-- Profile picture -->
-            <circle cx="296" cy="32" r="20" fill="white" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
-            <circle cx="296" cy="32" r="20" fill="url(#profileGradient)"/>
-            <text x="296" y="32" font-family="Arial" font-size="20" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">${user?.name?.charAt(0)?.toUpperCase() || 'M'}</text>
+            <!-- Top header bar with green -->
+            <rect width="336" height="50" fill="rgba(16, 185, 129, 0.2)" rx="16" ry="16"/>
             
-            <!-- Member name -->
-            <text x="20" y="92" font-family="Arial" font-size="10" fill="#bbf7d0">MEMBER NAME</text>
-            <text x="20" y="106" font-family="Arial" font-size="12" font-weight="bold" fill="white">${user?.name || 'Member Name'}</text>
+            <!-- TLA Logo and name header -->
+            <text x="16" y="28" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#10b981" letter-spacing="2">TANZANIA LIBRARY</text>
+            <text x="250" y="32" font-family="Arial, sans-serif" font-size="14" font-weight="900" fill="#10b981" text-anchor="end">TLA</text>
             
-            <!-- Membership number and phone -->
-            <text x="20" y="128" font-family="Arial" font-size="10" fill="#bbf7d0">MEMBERSHIP No:</text>
-            <text x="20" y="142" font-family="Arial" font-size="12" font-weight="bold" fill="white" font-family="monospace">${user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'N/A'}</text>
+            <!-- Chip icon area (left side) -->
+            <g>
+              <rect x="16" y="68" width="38" height="32" fill="rgba(255, 255, 255, 0.1)" stroke="rgba(16, 185, 129, 0.3)" stroke-width="1.5" rx="4" ry="4"/>
+              <!-- Chip pattern -->
+              <circle cx="24" cy="76" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
+              <circle cx="32" cy="76" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
+              <circle cx="40" cy="76" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
+              <circle cx="24" cy="84" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
+              <circle cx="32" cy="84" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
+              <circle cx="40" cy="84" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
+              <circle cx="24" cy="92" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
+              <circle cx="32" cy="92" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
+              <circle cx="40" cy="92" r="2.5" fill="rgba(16, 185, 129, 0.5)"/>
+            </g>
             
-            <text x="316" y="128" font-family="Arial" font-size="10" fill="#bbf7d0" text-anchor="end">PHONE:</text>
-            <text x="316" y="142" font-family="Arial" font-size="12" font-weight="bold" fill="white" text-anchor="end">${phone}</text>
+            <!-- Member name section -->
+            <text x="70" y="75" font-family="Arial, sans-serif" font-size="8" fill="#10b981" font-weight="700" letter-spacing="1">MEMBER NAME</text>
+            <text x="70" y="92" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">${user?.name?.substring(0, 20) || 'Member Name'}</text>
             
-            <!-- Type and signature -->
-            <text x="20" y="164" font-family="Arial" font-size="10" fill="#bbf7d0">TYPE:</text>
-            <text x="20" y="178" font-family="Arial" font-size="12" font-weight="bold" fill="white">${membershipStatus?.membership?.membershipType || 'Personal'}</text>
+            <!-- Membership number (similar to card number) -->
+            <g>
+              <text x="70" y="120" font-family="Arial, sans-serif" font-size="8" fill="#10b981" font-weight="700" letter-spacing="0.5">MEMBERSHIP No</text>
+              <!-- Display membership number as spaced groups -->
+              <text x="70" y="138" font-family="monospace" font-size="14" font-weight="bold" fill="white" letter-spacing="2">${(user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'N/A').substring(0, 16).split('').join(' ')}</text>
+            </g>
             
-            <!-- Signature line -->
-            <line x1="250" y1="172" x2="316" y1="172" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
-            <text x="316" y="164" font-family="Arial" font-size="10" fill="#bbf7d0" text-anchor="end">CHAIRMAN:</text>
-            <text x="316" y="178" font-family="Arial" font-size="12" font-weight="bold" font-style="italic" fill="white" text-anchor="end">Dr. A. M. Kimaro</text>
+            <!-- Bottom section with details -->
+            <g>
+              <!-- Expiry date -->
+              <text x="70" y="162" font-family="Arial, sans-serif" font-size="7" fill="#10b981" font-weight="700">VALID THRU</text>
+              <text x="70" y="174" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="white">12/26</text>
+              
+              <!-- Membership type -->
+              <text x="150" y="162" font-family="Arial, sans-serif" font-size="7" fill="#10b981" font-weight="700">TYPE</text>
+              <text x="150" y="174" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="white">${membershipStatus?.membership?.membershipType?.toUpperCase() || 'PERSONAL'}</text>
+              
+              <!-- Status badge with green -->
+              <rect x="240" y="155" width="80" height="28" fill="rgba(16, 185, 129, 0.2)" stroke="#10b981" stroke-width="1.5" rx="4" ry="4"/>
+              <text x="280" y="175" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#10b981" text-anchor="middle">✓ ACTIVE</text>
+            </g>
             
+            <!-- Bottom accent bar with green -->
+            <rect y="192" width="336" height="20" fill="rgba(16, 185, 129, 0.15)"/>
+            <text x="16" y="205" font-family="Arial, sans-serif" font-size="8" fill="rgba(255, 255, 255, 0.7)">Authorized Membership Card • Tanzania Library Association</text>
+          </svg>
+          </svg>
             <!-- Card strip -->
             <rect x="0" y="192" width="336" height="20" fill="url(#stripGradient)"/>
           </svg>
@@ -636,104 +658,86 @@ export default function MembershipCardPage() {
               {/* Standard Credit Card Size (85.6mm × 53.98mm) */}
               <div className="relative mx-auto membership-card" style={{ width: '336px', height: '212px' }}>
                 {/* Card Design - SVG-based to match print version exactly */}
-                <svg width="336" height="212" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 rounded-lg shadow-xl overflow-hidden" style={{ borderRadius: '12px' }}>
+                <svg width="336" height="212" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 rounded-lg shadow-xl overflow-hidden" style={{ borderRadius: '16px', boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.3)' }}>
                   {/* Background with gradient */}
                   <defs>
+                    {/* Main gradient: Gray to dark gray */}
                     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" style={{ stopColor: '#15803d', stopOpacity: 1 }} />
-                      <stop offset="50%" style={{ stopColor: '#16a34a', stopOpacity: 1 }} />
-                      <stop offset="100%" style={{ stopColor: '#166534', stopOpacity: 1 }} />
+                      <stop offset="0%" style={{ stopColor: '#2d3e50', stopOpacity: 1 }} />
+                      <stop offset="50%" style={{ stopColor: '#34495e', stopOpacity: 1 }} />
+                      <stop offset="100%" style={{ stopColor: '#1a252f', stopOpacity: 1 }} />
                     </linearGradient>
-                    <linearGradient id="stripGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" style={{ stopColor: '#14532d', stopOpacity: 0.8 }} />
-                      <stop offset="100%" style={{ stopColor: '#052e16', stopOpacity: 0.8 }} />
+                    
+                    {/* Green accent gradient */}
+                    <linearGradient id="greenAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" style={{ stopColor: '#10b981', stopOpacity: 1 }} />
+                      <stop offset="100%" style={{ stopColor: '#059669', stopOpacity: 1 }} />
                     </linearGradient>
-                    <linearGradient id="profileGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" style={{ stopColor: '#4ade80', stopOpacity: 1 }} />
-                      <stop offset="100%" style={{ stopColor: '#22c55e', stopOpacity: 1 }} />
+                    
+                    {/* Diagonal stripe pattern */}
+                    <pattern id="diagonalPattern" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                      <line x1="0" y1="0" x2="0" y2="60" stroke="rgba(16, 185, 129, 0.08)" strokeWidth="20"/>
+                    </pattern>
+                    
+                    {/* Semi-transparent overlay for depth */}
+                    <linearGradient id="overlay" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" style={{ stopColor: 'rgba(16, 185, 129, 0.1)', stopOpacity: 1 }} />
+                      <stop offset="100%" style={{ stopColor: 'rgba(16, 185, 129, 0.05)', stopOpacity: 1 }} />
                     </linearGradient>
-                    <filter id="blur1">
-                      <feGaussianBlur in="SourceGraphic" stdDeviation="3"/>
-                    </filter>
-                    <filter id="blur2">
-                      <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
-                    </filter>
-                    <filter id="blur3">
-                      <feGaussianBlur in="SourceGraphic" stdDeviation="4"/>
-                    </filter>
                   </defs>
                   
                   {/* Main background */}
-                  <rect width="336" height="212" fill="url(#bgGradient)" rx="12" ry="12"/>
+                  <rect width="336" height="212" fill="url(#bgGradient)" rx="16" ry="16"/>
                   
-                  {/* Background pattern with blur - simplified design */}
-                  <circle cx="276" cy="52" r="40" fill="white" opacity="0.15" filter="url(#blur1)"/>
-                  <circle cx="60" cy="160" r="30" fill="white" opacity="0.12" filter="url(#blur2)"/>
-                  <circle cx="168" cy="106" r="50" fill="white" opacity="0.08" filter="url(#blur3)"/>
+                  {/* Diagonal pattern overlay */}
+                  <rect width="336" height="212" fill="url(#diagonalPattern)" rx="16" ry="16"/>
                   
-                  {/* Logo background - circular */}
-                  <circle cx="36" cy="32" r="28" fill="white" stroke="none"/>
-                  <defs>
-                    <clipPath id="logoClip">
-                      <circle cx="36" cy="32" r="28"/>
-                    </clipPath>
-                  </defs>
-                  <image x="8" y="4" width="56" height="56" href="/logo.png" clipPath="url(#logoClip)" style={{ imageRendering: 'crisp-edges' }}/>
+                  {/* Green accent overlay for depth */}
+                  <rect width="336" height="212" fill="url(#overlay)" rx="16" ry="16"/>
+                  
+                  {/* Large diagonal green stripe (top right) */}
+                  <polygon points="200,0 336,0 336,150 150,0" fill="rgba(16, 185, 129, 0.15)"/>
+                  
+                  {/* Top header bar with green */}
+                  <rect width="336" height="50" fill="rgba(16, 185, 129, 0.2)" rx="16" ry="16"/>
+                  
+                  {/* Logo background - circular with white */}
+                  <circle cx="36" cy="28" r="20" fill="white" stroke="rgba(16, 185, 129, 0.3)" strokeWidth="2"/>
+                  <text x="36" y="28" fontFamily="Arial, sans-serif" fontSize="20" fontWeight="bold" fill="#059669" textAnchor="middle" dominantBaseline="middle">TLA</text>
                   
                   {/* Organization name */}
-                  <text x="168" y="32" fontFamily="Arial" fontSize="12" fontWeight="bold" fill="white" textAnchor="middle">Tanzania Library and</text>
-                  <text x="168" y="48" fontFamily="Arial" fontSize="12" fontWeight="bold" fill="white" textAnchor="middle">Information Association</text>
-                  <text x="168" y="62" fontFamily="Arial" fontSize="12" fill="#bbf7d0" textAnchor="middle">(TLA)</text>
+                  <text x="168" y="32" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">Tanzania Library and</text>
+                  <text x="168" y="48" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">Information Association</text>
+                  <text x="168" y="62" fontFamily="Arial" fontSize="10" fill="#10b981" textAnchor="middle" fontWeight="600">(TLA)</text>
                   
-                  {/* Profile picture - circular */}
-                  <circle cx="296" cy="32" r="28" fill="white" stroke="rgba(255,255,255,0.2)" strokeWidth="2"/>
-                  <defs>
-                    <clipPath id="profileClip">
-                      <circle cx="296" cy="32" r="28"/>
-                    </clipPath>
-                  </defs>
-                  {user?.profile?.personalInfo?.profilePicture ? (
-                    <image x="268" y="4" width="56" height="56" href={user.profile.personalInfo.profilePicture} clipPath="url(#profileClip)" style={{ imageRendering: 'crisp-edges' }}/>
-                  ) : (
-                    <circle cx="296" cy="32" r="28" fill="url(#profileGradient)"/>
-                  )}
-                  {!user?.profile?.personalInfo?.profilePicture && (
-                    <text x="296" y="32" fontFamily="Arial" fontSize="24" fontWeight="bold" fill="white" textAnchor="middle" dominantBaseline="middle">{user?.name?.charAt(0)?.toUpperCase() || 'M'}</text>
-                  )}
+                  {/* Profile picture - circular with green */}
+                  <circle cx="296" cy="32" r="20" fill="rgba(16, 185, 129, 0.1)" stroke="rgba(16, 185, 129, 0.4)" strokeWidth="2"/>
+                  <circle cx="296" cy="32" r="19" fill="url(#greenAccent)" stroke="white" strokeWidth="1.5"/>
+                  <text x="296" y="32" fontFamily="Arial" fontSize="20" fontWeight="bold" fill="white" textAnchor="middle" dominantBaseline="middle">{user?.name?.charAt(0)?.toUpperCase() || 'M'}</text>
                   
-                  {/* Member name */}
-                  <text x="20" y="92" fontFamily="Arial" fontSize="10" fill="#bbf7d0">MEMBER NAME</text>
-                  <text x="20" y="106" fontFamily="Arial" fontSize="12" fontWeight="bold" fill="white">{user?.name || 'Member Name'}</text>
+                  {/* Member name section */}
+                  <text x="70" y="75" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="1">MEMBER NAME</text>
+                  <text x="70" y="92" fontFamily="Arial, sans-serif" fontSize="13" fontWeight="bold" fill="white">{user?.name?.substring(0, 20) || 'Member Name'}</text>
                   
-                  {/* Membership number and phone */}
-                  <text x="20" y="128" fontFamily="Arial" fontSize="10" fill="#bbf7d0">MEMBERSHIP No:</text>
-                  <text x="20" y="142" fontFamily="Arial" fontSize="12" fontWeight="bold" fill="white" style={{ fontFamily: 'monospace' }}>{user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'N/A'}</text>
+                  {/* Membership number (similar to card number) */}
+                  <text x="70" y="120" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="0.5">MEMBERSHIP No</text>
+                  <text x="70" y="138" fontFamily="monospace" fontSize="14" fontWeight="bold" fill="white" letterSpacing="2">{(user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'N/A').substring(0, 16)}</text>
                   
-                  <text x="316" y="128" fontFamily="Arial" fontSize="10" fill="#bbf7d0" textAnchor="end">PHONE:</text>
-                  <text x="316" y="142" fontFamily="Arial" fontSize="12" fontWeight="bold" fill="white" textAnchor="end">
-                    {(() => {
-                      const phone1 = (user?.profile as any)?.phone;
-                      const contactInfo = (user?.profile as any)?.contact_info;
-                      let phone2 = null;
-                      try {
-                        phone2 = JSON.parse(contactInfo || '{}')?.phone;
-                      } catch (e) {
-                        return '+255 XXX XXX XXX';
-                      }
-                      return phone1 || phone2 || '+255 XXX XXX XXX';
-                    })()}
-                  </text>
+                  {/* Expiry date */}
+                  <text x="70" y="162" fontFamily="Arial, sans-serif" fontSize="7" fill="#10b981" fontWeight="700">VALID THRU</text>
+                  <text x="70" y="174" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="white">12/26</text>
                   
-                  {/* Type and signature */}
-                  <text x="20" y="164" fontFamily="Arial" fontSize="10" fill="#bbf7d0">TYPE:</text>
-                  <text x="20" y="178" fontFamily="Arial" fontSize="12" fontWeight="bold" fill="white">{membershipStatus?.membership?.membershipType || 'Personal'}</text>
+                  {/* Membership type */}
+                  <text x="150" y="162" fontFamily="Arial, sans-serif" fontSize="7" fill="#10b981" fontWeight="700">TYPE</text>
+                  <text x="150" y="174" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="white">{membershipStatus?.membership?.membershipType?.toUpperCase() || 'PERSONAL'}</text>
                   
-                  {/* Chairman signature - no line */}
-                  <text x="316" y="164" fontFamily="Arial" fontSize="10" fill="#bbf7d0" textAnchor="end">CHAIRMAN:</text>
-                  <text x="316" y="178" fontFamily="Arial" fontSize="12" fontWeight="bold" fontStyle="italic" fill="white" textAnchor="end">Dr. A. M. Kimaro</text>
+                  {/* Status badge with green */}
+                  <rect x="240" y="155" width="80" height="28" fill="rgba(16, 185, 129, 0.2)" stroke="#10b981" strokeWidth="1.5" rx="4" ry="4"/>
+                  <text x="280" y="175" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="#10b981" textAnchor="middle">✓ ACTIVE</text>
                   
-                  {/* Card strip */}
-                  <rect x="0" y="192" width="336" height="20" fill="url(#stripGradient)"/>
+                  {/* Bottom accent bar with green */}
+                  <rect y="192" width="336" height="20" fill="rgba(16, 185, 129, 0.15)"/>
+                  <text x="16" y="205" fontFamily="Arial, sans-serif" fontSize="8" fill="rgba(255, 255, 255, 0.7)">Authorized Membership Card • TLA</text>
                 </svg>
               </div>
 

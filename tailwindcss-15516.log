@@ -1171,3 +1171,4 @@
 2026-01-15T15:40:52.830299Z  INFO get_globs:scan_sources: tailwindcss_oxide::scanner: Discovering "C:\\xampp\\htdocs\\tutorial2\\public\\uploads\\profile-pictures"
 2026-01-15T15:40:52.831818Z  INFO get_globs:scan_sources: tailwindcss_oxide::scanner: Discovering "C:\\xampp\\htdocs\\tutorial2\\types"
 2026-01-15T15:40:52.832373Z  INFO get_globs:scan_sources: tailwindcss_oxide::scanner: exit
+2026-01-15T15:40:52.852433Z  INFO get_globs: tailwindcss_oxide::scanner: exit

@@ -3,9 +3,7 @@ import { pool } from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
-import { Resend } from 'resend';
-
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+import { sendRejectionNotification } from '@/lib/notificationService';
 
 interface User extends RowDataPacket {
   id: number;
@@ -27,7 +25,7 @@ export async function POST(
     
     // Get rejection reason from request body
     const body = await request.json().catch(() => ({}));
-    const rejectionReason = body.reason || 'No specific reason provided';
+    const rejectionReason = body.reason || undefined;
 
     const authHeader = request.headers.get('authorization');
     const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
@@ -105,36 +103,18 @@ export async function POST(
 
       console.log('User rejected successfully:', userId);
 
+      // Send rejection notification using the notification service
       try {
-        await resend.emails.send({
-          from: 'TLA <onboarding@resend.dev>',
-          to: user.email,
-          subject: 'Your Account Was Not Approved',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h1 style="color: #111827; font-size: 24px; margin-bottom: 20px;">
-                Hello, ${user.name}
-              </h1>
-              <p style="color: #374151; line-height: 1.6; margin-bottom: 20px;">
-                Your account request was not approved at this time.
-              </p>
-              ${rejectionReason ? `
-              <div style="background-color: #FEF2F2; border: 1px solid #FEE2E2; border-radius: 8px; padding: 16px; margin: 20px 0;">
-                <p style="margin: 0; font-weight: 500; color: #991B1B; margin-bottom: 8px;">Reason:</p>
-                <p style="margin: 0; color: #7F1D1D;">${rejectionReason}</p>
-              </div>
-              ` : ''}
-              <p style="color: #374151; line-height: 1.6; margin-bottom: 20px;">
-                If you believe this is a mistake, please contact TLA for assistance.
-              </p>
-              <p style="color: #6B7280; font-size: 14px; margin-top: 30px; border-top: 1px solid #E5E7EB; padding-top: 20px;">
-                Tanzania Library and Information Association (TLA)
-              </p>
-            </div>
-          `,
-        });
+        console.log(`[REJECT] Attempting to send rejection notification to ${user.email}`);
+        const notificationSent = await sendRejectionNotification(
+          user.id,
+          user.name,
+          rejectionReason
+        );
+        console.log(`[REJECT] Notification send result:`, notificationSent);
       } catch (emailError) {
-        console.error('Failed to send rejection email:', emailError);
+        console.error('[REJECT] Failed to send rejection email:', emailError);
+        // Don't fail the request if email fails
       }
 
       return NextResponse.json({

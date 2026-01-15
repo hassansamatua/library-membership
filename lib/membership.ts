@@ -90,36 +90,32 @@ export async function updateMembershipPayment(paymentData: {
         
         // Check if membership already exists
         const [membershipRows] = await connection.query<RowDataPacket[]>(
-          'SELECT membership_number FROM memberships WHERE user_id = ?',
+          'SELECT id, membership_number FROM memberships WHERE user_id = ?',
           [user_id]
         );
 
         let membershipNumber = membershipRows[0]?.membership_number;
-        if (!membershipNumber) {
-          membershipNumber = await generateMembershipNumber();
-        }
-
-        // Update existing membership record
-        await connection.query(
-          `UPDATE memberships SET 
-           membership_number = ?,
-           membership_type = ?,
-           status = 'active',
-           payment_status = 'paid',
-           payment_date = CURDATE(),
-           amount_paid = ?,
-           expiry_date = DATE_ADD(CURDATE(), INTERVAL 1 YEAR),
-           updated_at = NOW()
-           WHERE user_id = ?`,
-          [membershipNumber, membership_type, paymentData.amount, user_id]
-        );
-
-        // If no membership record existed, insert one
-        const [result] = await connection.query<RowDataPacket[]>(
-          'SELECT ROW_COUNT() as affected'
-        );
-
-        if (result[0].affected === 0) {
+        
+        if (membershipRows.length > 0) {
+          // Membership exists, just update payment info (don't touch membership_number)
+          await connection.query(
+            `UPDATE memberships SET 
+             membership_type = ?,
+             status = 'active',
+             payment_status = 'paid',
+             payment_date = CURDATE(),
+             amount_paid = ?,
+             expiry_date = DATE_ADD(CURDATE(), INTERVAL 1 YEAR),
+             updated_at = NOW()
+             WHERE user_id = ?`,
+            [membership_type, paymentData.amount, user_id]
+          );
+        } else {
+          // No membership exists, create new one
+          if (!membershipNumber) {
+            membershipNumber = await generateMembershipNumber();
+          }
+          
           await connection.query(
             `INSERT INTO memberships 
              (user_id, membership_number, membership_type, status, payment_status, payment_date, amount_paid, join_date, expiry_date)
