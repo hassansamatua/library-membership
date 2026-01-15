@@ -31,26 +31,34 @@ export default function MembershipCardPage() {
   const [membershipStatus, setMembershipStatus] = useState<MembershipStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const loadMembershipStatus = async () => {
+    try {
+      const res = await fetch('/api/membership/status', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setMembershipStatus(data);
+        console.log('🔍 Membership Card - Refreshed membership status:', data);
+      } else {
+        setError('Failed to load membership status');
+      }
+    } catch (err) {
+      setError('Error loading membership status');
+      console.error('Error loading membership status:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const forceRefresh = () => {
+    setRefreshKey(prev => prev + 1); // Force re-render
+    loadMembershipStatus(); // Reload data
+  };
 
   useEffect(() => {
-    const loadMembershipStatus = async () => {
-      try {
-        const res = await fetch('/api/membership/status', { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          setMembershipStatus(data);
-        } else {
-          setError('Failed to load membership status');
-        }
-      } catch (err) {
-        setError('Error loading membership status');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadMembershipStatus();
-  }, []);
+  }, [refreshKey]);
 
   const handleDownload = () => {
     // Create a canvas element to generate the card as an image
@@ -610,7 +618,15 @@ export default function MembershipCardPage() {
       <div className="min-h-screen bg-gray-100 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Membership Card</h1>
+            <div className="flex justify-between items-center">
+              <h1 className="text-3xl font-bold text-gray-900">Membership Card</h1>
+              <button
+                onClick={forceRefresh}
+                className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+              >
+                Refresh Status
+              </button>
+            </div>
             <p className="mt-2 text-gray-600">Your official Tanzania Library Association membership card</p>
           </div>
 

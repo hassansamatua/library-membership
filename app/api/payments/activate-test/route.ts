@@ -1,112 +1,192 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
+import { verifyToken } from '@/lib/auth';
+import { cookies } from 'next/headers';
+
+interface PaymentRow {
+  id: number;
+  user_id: number;
+  amount: number;
+  membership_type: string;
+  payment_method: string;
+  reference: string;
+}
+
+async function getAuthToken(request: Request) {
+  const authHeader = request.headers.get('authorization');
+  const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+  if (authToken) return authToken;
+
+  const cookieStore = await cookies();
+  return cookieStore.get('token')?.value || null;
+}
 
 export async function POST(request: Request) {
+  let connection;
+  
   try {
     const { reference } = await request.json();
-
+    
     if (!reference) {
       return NextResponse.json({ error: 'Reference is required' }, { status: 400 });
     }
 
-    const connection = await pool.getConnection();
-
-    try {
-      // For test payments, activate membership directly
-      const [paymentRows] = await connection.execute(
-        'SELECT user_id, membership_type FROM payments WHERE reference = ?',
-        [reference]
-      );
-
-      if (!paymentRows || paymentRows.length === 0) {
-
-        let membershipNumber = membershipRows[0][0]?.membership_number;
-        if (!membershipNumber) {
-          // Generate membership number
-          const year = new Date().getFullYear().toString().slice(-2);
-          const [sequenceRows] = await connection.execute(
-            'SELECT last_number FROM membership_sequence WHERE year = ? FOR UPDATE',
-            [year]
-          );
-          
-          let nextNumber = 1;
-          if (sequenceRows[0].length > 0) {
-            nextNumber = sequenceRows[0][0].last_number + 1;
-            await connection.execute(
-              'UPDATE membership_sequence SET last_number = ? WHERE year = ?',
-              [nextNumber, year]
-            );
-          } else {
-            await connection.execute(
-              'INSERT INTO membership_sequence (year, last_number) VALUES (?, ?)',
-              [year, nextNumber]
-            );
-          }
-          
-          membershipNumber = `TLA${year}${nextNumber.toString().padStart(5, '0')}`;
-        }
-
-        // Update payment record with proper timestamp
-        await connection.execute(
-          `UPDATE payments SET 
-             transaction_id = ?, 
-             status = 'completed', 
-             paid_at = NOW(),
-             payment_method = ?
-             WHERE reference = ?`,
-          [
-            `TEST-TXN-${Date.now()}`,
-            'test',
-            reference
-          ]
-        );
-
-        // Update or create membership record
-        const [result] = await connection.execute(
-          `UPDATE memberships SET 
-             membership_number = ?,
-             membership_type = ?,
-             status = 'active',
-             payment_status = 'paid',
-             payment_date = CURDATE(),
-             amount_paid = ?,
-             expiry_date = DATE_ADD(CURDATE(), INTERVAL 1 YEAR),
-             updated_at = NOW()
-             WHERE user_id = ?`,
-          [membershipNumber, membership_type, 40000, user_id]
-        );
-
-        // If no membership record existed, insert one
-        if (result[1].affectedRows === 0) {
-          await connection.execute(
-            `INSERT INTO memberships 
-               (user_id, membership_number, membership_type, status, payment_status, payment_date, amount_paid, join_date, expiry_date)
-               VALUES (?, ?, 'personal', 'active', 'paid', CURDATE(), ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 1 YEAR))`,
-            [user_id, membershipNumber, 40000]
-          );
-        }
-
-        console.log('Test membership activated for reference:', reference);
-
-        return NextResponse.json({ 
-          success: true, 
-          message: 'Test membership activated successfully',
-          reference,
-          membershipNumber,
-          paymentStatus: 'completed'
-        });
-      } else {
-        return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
-      }
-    } finally {
-      connection.release();
+    // Get the authenticated user from the session
+    const token = await getAuthToken(request);
+    
+    if (!token) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
+    // Verify the token and get user ID
+    const decoded = verifyToken(token);
+    
+    if (!decoded?.id) {
+      return NextResponse.json({ error: 'Invalid user' }, { status: 401 });
+    }
+
+    const userId = typeof decoded.id === 'string' ? parseInt(decoded.id) : decoded.id;
+    
+    // Get database connection
+    connection = await pool.getConnection();
+    
+    // Start transaction
+    await connection.beginTransaction();
+    
+    try {
+      // 1. Get payment details first
+      const [paymentRows] = await connection.query<PaymentRow[]>(
+        `SELECT id, user_id, amount, membership_type, payment_method, reference 
+         FROM payments 
+         WHERE reference = ? AND user_id = ? 
+         LIMIT 1`,
+        [reference, userId]
+      );
+      
+      if (!paymentRows || paymentRows.length === 0) {
+        await connection.rollback();
+        return NextResponse.json(
+          { success: false, error: 'Payment not found' },
+          { status: 404 }
+        );
+      }
+      
+      const payment = paymentRows[0];
+      
+      // 2. Update payment status to completed
+      await connection.execute(
+        `UPDATE payments 
+         SET status = 'completed', 
+             paid_at = NOW(),
+             updated_at = NOW()
+         WHERE id = ? AND user_id = ?`,
+        [payment.id, userId]
+      );
+      
+      // 3. Generate membership number
+      const year = new Date().getFullYear().toString().slice(-2);
+      const membershipNumber = `TLA${year}${Math.floor(10000 + Math.random() * 90000)}`;
+      const currentYear = new Date().getFullYear();
+      
+      // 4. Create or update membership with all required fields
+      await connection.execute(
+        `INSERT INTO memberships 
+         (user_id, membership_number, membership_type, status, 
+          payment_status, payment_date, reference, payment_method,
+          expiry_date, amount_paid, created_at, updated_at)
+         VALUES (?, ?, ?, 'active', 'paid', NOW(), ?, ?, 
+                DATE_ADD(NOW(), INTERVAL 1 YEAR), ?, NOW(), NOW())
+         ON DUPLICATE KEY UPDATE
+           status = 'active',
+           membership_type = VALUES(membership_type),
+           payment_status = 'paid',
+           payment_date = NOW(),
+           reference = VALUES(reference),
+           payment_method = VALUES(payment_method),
+           expiry_date = VALUES(expiry_date),
+           amount_paid = VALUES(amount_paid),
+           updated_at = NOW()`,
+        [
+          userId, 
+          membershipNumber,
+          payment.membership_type || 'personal',
+          payment.reference,
+          payment.payment_method || 'test',
+          payment.amount || 40000
+        ]
+      );
+      
+      // 5. Create payment record in membership_payments
+      await connection.execute(
+        `INSERT INTO membership_payments 
+         (user_id, amount, payment_method, reference, 
+          payment_date, status, cycle_year)
+         VALUES (?, ?, ?, ?, NOW(), 'completed', ?)
+         ON DUPLICATE KEY UPDATE
+           status = 'completed',
+           updated_at = NOW()`,
+        [
+          userId,
+          payment.amount || 40000,
+          payment.payment_method || 'test',
+          payment.reference,
+          currentYear
+        ]
+      );
+      
+      // Commit the transaction
+      await connection.commit();
+      
+      console.log('✓ Test payment activated successfully:', {
+        reference,
+        userId,
+        membershipNumber,
+        status: 'completed'
+      });
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Payment and membership updated successfully',
+        data: {
+          membershipNumber,
+          reference: payment.reference,
+          amount: payment.amount || 40000,
+          paymentMethod: payment.payment_method || 'test',
+          status: 'completed'
+        }
+      });
+    } catch (error) {
+      // Rollback in case of error
+      if (connection) {
+        await connection.rollback();
+      }
+      console.error('Error processing payment:', error);
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Failed to process payment',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error('Error activating test membership:', error);
+    console.error('Error in activate-test endpoint:', error);
     return NextResponse.json(
-      { error: 'Failed to activate test membership' },
+      { 
+        success: false, 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
+  } finally {
+    if (connection) {
+      try {
+        await connection.release();
+      } catch (err) {
+        console.error('Error releasing connection:', err);
+      }
+    }
   }
 }

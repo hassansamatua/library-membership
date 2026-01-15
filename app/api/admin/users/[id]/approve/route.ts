@@ -163,10 +163,12 @@ async function handleApproveUser(request: Request, userId: string) {
 
       // Generate membership number if not exists
       let membershipNumber = user.membership_number;
-      if (!membershipNumber) {
-        const year = new Date().getFullYear().toString().slice(-2); // Get last 2 digits
+      if (!membershipNumber || membershipNumber.trim() === '') {
+        const year = new Date().getFullYear(); // Full year (2026)
         const randomNum = Math.floor(10000 + Math.random() * 90000); // 5-digit random number
         membershipNumber = `TLA${year}${randomNum}`;
+        
+        console.log('Generated new membership number:', membershipNumber);
         
         // Store membership number in database
         await connection.query(

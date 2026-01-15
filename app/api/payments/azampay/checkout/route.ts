@@ -35,19 +35,40 @@ export async function POST(request: NextRequest) {
                   '+255000000000';
     }
 
-    // Create payment record first
+    // Try AzamPay checkout FIRST to get the reference
+    let checkoutResponse;
+    try {
+      checkoutResponse = await azampayService.createMembershipPayment({
+        userId,
+        membershipType,
+        amount,
+        userEmail: customerEmail || user.email,
+        userPhone: phoneNumber,
+        orderId,
+        paymentMethod, // Pass the selected mobile money provider
+      });
+    } catch (checkoutError) {
+      console.error('AzamPay checkout error:', checkoutError);
+      return NextResponse.json(
+        { error: 'Failed to create payment checkout' },
+        { status: 500 }
+      );
+    }
+
+    // Now create payment record with the checkout reference
+    const paymentReference = checkoutResponse.data.reference;
     const { pool } = await import('@/lib/db');
     const connection = await pool.getConnection();
     
     try {
-      // Try direct insertion since table structure is now correct
+      // Create payment record with the checkout reference
       await connection.query(
-        `INSERT INTO payments (reference, user_id, membership_type, amount, currency, status, payment_method, phone_number, created_at)
-         VALUES (?, ?, ?, ?, 'TZS', 'pending', ?, ?, NOW())`,
-        [orderId, userId, membershipType, amount, paymentMethod, phoneNumber]
+        `INSERT INTO payments (reference, user_id, membership_type, amount, currency, status, payment_method, phone_number, checkout_url, created_at)
+         VALUES (?, ?, ?, ?, 'TZS', 'pending', ?, ?, ?, NOW())`,
+        [paymentReference, userId, membershipType, amount, paymentMethod, phoneNumber, checkoutResponse.data.checkoutUrl]
       );
       
-      console.log('Payment record created successfully');
+      console.log('Payment record created with reference:', paymentReference);
       
     } catch (dbError: any) {
       console.error('Database error:', dbError);
@@ -83,9 +104,9 @@ export async function POST(request: NextRequest) {
           
           // Try inserting again
           await connection.query(
-            `INSERT INTO payments (reference, user_id, membership_type, amount, currency, status, payment_method, phone_number, created_at)
-             VALUES (?, ?, ?, ?, 'TZS', 'pending', ?, ?, NOW())`,
-            [orderId, userId, membershipType, amount, paymentMethod, phoneNumber]
+            `INSERT INTO payments (reference, user_id, membership_type, amount, currency, status, payment_method, phone_number, checkout_url, created_at)
+             VALUES (?, ?, ?, ?, 'TZS', 'pending', ?, ?, ?, NOW())`,
+            [paymentReference, userId, membershipType, amount, paymentMethod, phoneNumber, checkoutResponse.data.checkoutUrl]
           );
         } catch (createError) {
           console.error('Failed to create table:', createError);
@@ -98,65 +119,29 @@ export async function POST(request: NextRequest) {
       connection.release();
     }
 
-    // Try AzamPay checkout
-    try {
-      const checkoutResponse = await azampayService.createMembershipPayment({
-        userId,
-        membershipType,
+    // If in test mode, immediately complete the payment
+    if (checkoutResponse.data.reference.startsWith('TEST-')) {
+      console.log('Test mode detected: Immediately completing payment');
+      
+      // Update payment status to completed
+      const { updateMembershipPayment } = await import('@/lib/membership');
+      console.log('Updating membership payment with:', {
+        reference: paymentReference,
+        transactionId: checkoutResponse.data.transactionId,
         amount,
-        userEmail: customerEmail || user.email,
-        userPhone: phoneNumber,
-        orderId,
-        paymentMethod, // Pass the selected mobile money provider
+        paymentMethod: 'Test Payment',
+        status: 'completed',
+        paidAt: new Date(),
       });
-
-      // Update payment record with checkout URL
-      const connection2 = await pool.getConnection();
-      try {
-        await connection2.query(
-          'UPDATE payments SET checkout_url = ? WHERE reference = ?',
-          [checkoutResponse.data.checkoutUrl, orderId]
-        );
-      } finally {
-        connection2.release();
-      }
-
-      // If in test mode, immediately complete the payment
-      if (process.env.AZAMPAY_TEST_MODE === 'true' && checkoutResponse.data.reference.startsWith('TEST-')) {
-        console.log('Test mode: Immediately completing payment');
-        
-        // Update payment status to completed
-        const { updateMembershipPayment } = await import('@/lib/membership');
-        console.log('Updating membership payment with:', {
-          reference: checkoutResponse.data.reference,
-          transactionId: checkoutResponse.data.transactionId,
-          amount,
-          paymentMethod: 'Test Payment',
-          status: 'completed',
-          paidAt: new Date(),
-        });
-        await updateMembershipPayment({
-          reference: checkoutResponse.data.reference,
-          transactionId: checkoutResponse.data.transactionId,
-          amount,
-          paymentMethod: 'Test Payment',
-          status: 'completed',
-          paidAt: new Date(),
-        });
-        console.log('Membership payment updated successfully');
-
-        return NextResponse.json({
-          success: true,
-          checkoutUrl: checkoutResponse.data.checkoutUrl,
-          reference: checkoutResponse.data.reference,
-          transactionId: checkoutResponse.data.transactionId,
-          orderId,
-          amount,
-          currency: 'TZS',
-          testMode: true,
-          immediatelyCompleted: true,
-        });
-      }
+      await updateMembershipPayment({
+        reference: paymentReference,
+        transactionId: checkoutResponse.data.transactionId,
+        amount,
+        paymentMethod: 'Test Payment',
+        status: 'completed',
+        paidAt: new Date(),
+      });
+      console.log('Membership payment updated successfully');
 
       return NextResponse.json({
         success: true,
@@ -166,27 +151,20 @@ export async function POST(request: NextRequest) {
         orderId,
         amount,
         currency: 'TZS',
-      });
-
-    } catch (azampayError) {
-      console.error('AzamPay checkout failed:', azampayError);
-      
-      // Fallback: Create a manual payment record and show payment instructions
-      return NextResponse.json({
-        success: false,
-        fallback: true,
-        error: 'Payment gateway temporarily unavailable. Please contact support.',
-        reference: orderId,
-        amount,
-        currency: 'TZS',
-        paymentInstructions: {
-          message: 'Please contact TLA office to complete payment',
-          phone: '+255 22 211 3456',
-          email: 'membership@tla.or.tz',
-          reference: orderId,
-        }
+        testMode: true,
+        immediatelyCompleted: true,
       });
     }
+
+    return NextResponse.json({
+      success: true,
+      checkoutUrl: checkoutResponse.data.checkoutUrl,
+      reference: checkoutResponse.data.reference,
+      transactionId: checkoutResponse.data.transactionId,
+      orderId,
+      amount,
+      currency: 'TZS',
+    });
 
   } catch (error) {
     console.error('Payment checkout error:', error);

@@ -21,7 +21,10 @@ if (preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
     $decoded = validateJWT($token);
     
     if ($decoded) {
-        $query = 'SELECT id, name, email, is_admin, is_approved FROM users WHERE id = ? LIMIT 1';
+        $query = 'SELECT u.id, u.name, u.email, u.is_admin, u.is_approved, up.membership_number, up.membership_type, up.membership_status, up.join_date, up.membership_expiry 
+                   FROM users u 
+                   LEFT JOIN user_profiles up ON u.id = up.user_id 
+                   WHERE u.id = ? LIMIT 1';
         $stmt = $db->prepare($query);
         $stmt->execute([$decoded['id']]);
         
@@ -33,7 +36,12 @@ if (preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
                 'name' => $row['name'],
                 'email' => $row['email'],
                 'isAdmin' => (bool)$row['is_admin'],
-                'isApproved' => (bool)$row['is_approved']
+                'isApproved' => (bool)$row['is_approved'],
+                'membershipNumber' => $row['membership_number'] ?: $row['membership_number'], // Prioritize user_profiles data
+                'membershipType' => $row['membership_type'] ?: null,
+                'membershipStatus' => $row['membership_status'] ?: null,
+                'joinDate' => $row['join_date'] ?: null,
+                'expiryDate' => $row['membership_expiry'] ?: null
             ]);
         } else {
             http_response_code(404);

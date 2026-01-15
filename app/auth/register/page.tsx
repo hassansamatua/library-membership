@@ -5,15 +5,40 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 
-// List of all Tanzanian regions
-const TANZANIA_REGIONS = [
-  "Arusha", "Dar es Salaam", "Dodoma", "Geita", "Iringa", "Kagera",
-  "Katavi", "Kigoma", "Kilimanjaro", "Lindi", "Manyara", "Mara", "Mbeya",
-  "Mjini Magharibi", "Morogoro", "Mtwara", "Mwanza", "Njombe", "Pemba North",
-  "Pemba South", "Pwani", "Rukwa", "Ruvuma", "Shinyanga", "Simiyu", "Singida",
-  "Songwe", "Tabora", "Tanga", "Unguja North", "Unguja South"
-];
+// List of all Tanzanian regions and their districts
+const TANZANIA_DISTRICTS: Record<string, string[]> = {
+  "Arusha": ["Arusha City", "Arusha District", "Karatu", "Longido", "Meru", "Monduli", "Ngorongoro"],
+  "Dar es Salaam": ["Ilala", "Kigamboni", "Kinondoni", "Temeke", "Ubungo"],
+  "Dodoma": ["Bahi", "Chamwino", "Chemba", "Dodoma City", "Kondoa", "Kongwa", "Mpwapwa"],
+  "Mwanza": ["Ilemela", "Nyamagana", "Misungwi", "Kwimba", "Magu", "Sengerema", "Ukerewe"],
+  "Mbeya": ["Mbeya City", "Mbeya District", "Chunya", "Kyela", "Mbarali", "Rungwe"],
+  "Moshi": ["Moshi Urban", "Moshi Rural", "Hai", "Rombo", "Mwanga", "Same"],
+  "Tanga": ["Tanga City", "Handeni", "Kilindi", "Korogwe", "Lushoto", "Mkinga", "Muheza", "Pangani"],
+  "Morogoro": ["Morogoro Urban", "Morogoro Rural", "Gairo", "Kilombero", "Kilosa", "Mvomero", "Ulanga"],
+  "Mtwara": ["Mtwara Urban", "Mtwara Rural", "Masasi", "Nanyumbu", "Newala", "Tandahimba"],
+  "Lindi": ["Lindi Urban", "Lindi Rural", "Kilwa", "Liwale", "Nachingwea", "Ruangwa"],
+  "Ruvuma": ["Songea Urban", "Songea Rural", "Mbinga", "Namtumbo", "Nyasa", "Tunduru"],
+  "Iringa": ["Iringa Urban", "Iringa Rural", "Kilolo", "Mafinga", "Mufindi", "Makete", "Ludewa"],
+  "Njombe": ["Njombe Urban", "Njombe Rural", "Ludewa", "Makambako", "Wanging'ombe", "Makete"],
+  "Rukwa": ["Sumbawanga Urban", "Sumbawanga Rural", "Kalambo", "Nkasi"],
+  "Katavi": ["Mpanda", "Mlele", "Tanganyika"],
+  "Shinyanga": ["Shinyanga Urban", "Shinyanga Rural", "Kahama", "Kishapu"],
+  "Simiyu": ["Bariadi", "Busega", "Itilima", "Maswa", "Meatu"],
+  "Geita": ["Geita", "Bukombe", "Chato", "Mbogwe", "Nyang'hwale"],
+  "Kagera": ["Bukoba Urban", "Bukoba Rural", "Karagwe", "Kyerwa", "Misenyi", "Muleba", "Ngara"],
+  "Kigoma": ["Kigoma Urban", "Kigoma Rural", "Kakonko", "Kasulu", "Kibondo", "Uvinza"],
+  "Tabora": ["Tabora Urban", "Tabora Rural", "Igunga", "Kaliua", "Nzega", "Sikonge", "Urambo"],
+  "Singida": ["Singida Urban", "Singida Rural", "Ikungi", "Iramba", "Manyoni", "Mkalama"],
+  "Manyara": ["Babati", "Hanang", "Kiteto", "Mbulu", "Simanjiro"],
+  "Pemba North": ["Wete", "Micheweni"],
+  "Pemba South": ["Chake Chake", "Mkoani"],
+  "Unguja North": ["North A", "North B"],
+  "Unguja South": ["Central", "South"]
+};
+
+const TANZANIA_REGIONS = Object.keys(TANZANIA_DISTRICTS);
 
 export default function RegisterPage() {
   type MembershipType = 'personal' | 'organization';
@@ -56,6 +81,8 @@ export default function RegisterPage() {
 
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { register } = useAuth();
   const router = useRouter();
 
@@ -86,26 +113,8 @@ export default function RegisterPage() {
     const trimmedPassword = password?.trim() || "";
     const trimmedConfirmPassword = confirmPassword?.trim() || "";
 
-    // Comprehensive debugging
-    console.log('=== PASSWORD VALIDATION DEBUG ===');
-    console.log('Raw password:', JSON.stringify(password));
-    console.log('Raw confirmPassword:', JSON.stringify(confirmPassword));
-    console.log('Trimmed password:', JSON.stringify(trimmedPassword));
-    console.log('Trimmed confirmPassword:', JSON.stringify(trimmedConfirmPassword));
-    console.log('Password length:', password.length);
-    console.log('Confirm password length:', confirmPassword.length);
-    console.log('Trimmed password length:', trimmedPassword.length);
-    console.log('Trimmed confirm password length:', trimmedConfirmPassword.length);
-    console.log('Exact match:', password === confirmPassword);
-    console.log('Trimmed match:', trimmedPassword === trimmedConfirmPassword);
-    console.log('Strict equality test:', trimmedPassword === trimmedConfirmPassword);
-    console.log('Character codes password:', Array.from(trimmedPassword).map(c => c.charCodeAt(0)));
-    console.log('Character codes confirm:', Array.from(trimmedConfirmPassword).map(c => c.charCodeAt(0)));
-    console.log('=== END DEBUG ===');
-
-    // Simple validation - just check if they match after trim
+    // Password validation
     if (trimmedPassword !== trimmedConfirmPassword) {
-      console.log('VALIDATION FAILED: Passwords do not match');
       setError("Passwords do not match");
       return;
     }
@@ -117,6 +126,18 @@ export default function RegisterPage() {
 
     if (!formData.nida || formData.nida.length < 16) {
       setError("Please enter a valid NIDA number (16 digits)");
+      return;
+    }
+
+    // Check required academic fields
+    if (!formData.educationLevel || !formData.institutionName || !formData.yearOfCompletion) {
+      setError("Please fill in all required academic information (Education Level, Institution Name, and Year of Completion)");
+      return;
+    }
+
+    // Check required employment fields
+    if (!formData.occupation || !formData.employerName || !formData.workAddress) {
+      setError("Please fill in all required employment information (Occupation, Employer Name, and Work Address)");
       return;
     }
 
@@ -264,19 +285,29 @@ export default function RegisterPage() {
                   <label className="block text-sm font-medium text-gray-700">
                     Password <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="password"
-                    name="password"
-                    required
-                    minLength={8}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="At least 8 characters"
-                  />
-                  {formData.password && formData.password.length < 8 && (
-                    <p className="mt-1 text-sm text-red-600">Password must be at least 8 characters</p>
-                  )}
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      required
+                      minLength={8}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 pr-10 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder="At least 8 characters"
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <Eye className="h-5 w-5 text-gray-400" />
+                      ) : (
+                        <EyeOff className="h-5 w-5 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
@@ -292,35 +323,27 @@ export default function RegisterPage() {
                     onChange={handleChange}
                     placeholder="Confirm your password"
                   />
-                  {formData.confirmPassword && (
-                    <p className={`mt-1 text-sm ${formData.password.trim() === formData.confirmPassword.trim() ? 'text-green-600' : 'text-red-600'}`}>
-                      {formData.password.trim() === formData.confirmPassword.trim() ? 'Passwords match' : 'Passwords do not match'}
-                    </p>
-                  )}
                 </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Phone Number <span className="text-red-500">*</span>
+                    Phone Number
                   </label>
                   <input
                     type="tel"
                     name="phoneNumber"
-                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
                     value={formData.phoneNumber}
                     onChange={handleChange}
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Country <span className="text-red-500">*</span>
+                    Country
                   </label>
                   <select
                     name="country"
-                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
                     value={formData.country}
                     onChange={handleChange}
@@ -328,19 +351,25 @@ export default function RegisterPage() {
                     <option value="Tanzania">Tanzania</option>
                     <option value="Kenya">Kenya</option>
                     <option value="Uganda">Uganda</option>
-                    {/* Add more countries as needed */}
                   </select>
                 </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Region <span className="text-red-500">*</span>
+                    Region
                   </label>
                   <select
                     name="region"
-                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
                     value={formData.region}
-                    onChange={handleChange}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        region: e.target.value,
+                        district: ""
+                      }));
+                    }}
                   >
                     <option value="">Select Region</option>
                     {TANZANIA_REGIONS.map(region => (
@@ -352,20 +381,23 @@ export default function RegisterPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    District <span className="text-red-500">*</span>
+                    District
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="district"
-                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
                     value={formData.district}
                     onChange={handleChange}
-                  />
+                    disabled={!formData.region}
+                  >
+                    <option value="">{formData.region ? "Select District" : "Select Region First"}</option>
+                    {formData.region && TANZANIA_DISTRICTS[formData.region]?.map(district => (
+                      <option key={district} value={district}>
+                        {district}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Ward
@@ -378,6 +410,8 @@ export default function RegisterPage() {
                     onChange={handleChange}
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Street
@@ -403,7 +437,6 @@ export default function RegisterPage() {
                   />
                 </div>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
@@ -433,17 +466,91 @@ export default function RegisterPage() {
             </>
           )}
 
+          {/* Academic Qualifications Section */}
+          {renderSection("Academic Qualifications",
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Highest Education Level <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="educationLevel"
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.educationLevel}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select Education Level</option>
+                    <option value="Primary">Primary School</option>
+                    <option value="O-Level">O-Level</option>
+                    <option value="A-Level">A-Level</option>
+                    <option value="Diploma">Diploma</option>
+                    <option value="Bachelor">Bachelor's Degree</option>
+                    <option value="Master">Master's Degree</option>
+                    <option value="PhD">PhD</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Institution Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="institutionName"
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.institutionName}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Year of Completion <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="yearOfCompletion"
+                    required
+                    min="1900"
+                    max={new Date().getFullYear()}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.yearOfCompletion}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Skills/Qualifications
+                  </label>
+                  <input
+                    type="text"
+                    name="skills"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    value={formData.skills}
+                    onChange={handleChange}
+                    placeholder="e.g., Computer Skills, Languages, etc."
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
           {/* Employment Information Section */}
           {renderSection("Employment Information",
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Occupation/Profession
+                    Occupation/Profession <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     name="occupation"
+                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
                     value={formData.occupation}
                     onChange={handleChange}
@@ -451,11 +558,12 @@ export default function RegisterPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Employer Name
+                    Employer Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     name="employerName"
+                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
                     value={formData.employerName}
                     onChange={handleChange}
@@ -466,11 +574,12 @@ export default function RegisterPage() {
               <div className="grid grid-cols-1 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Work Address
+                    Work Address <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     name="workAddress"
+                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
                     value={formData.workAddress}
                     onChange={handleChange}
@@ -503,74 +612,6 @@ export default function RegisterPage() {
                     onChange={handleChange}
                   />
                 </div>
-              </div>
-            </>
-          )}
-
-          {/* Education Background Section */}
-          {renderSection("Education Background",
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Highest Education Level
-                  </label>
-                  <select
-                    name="educationLevel"
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                    value={formData.educationLevel}
-                    onChange={handleChange}
-                  >
-                    <option value="">Select Education Level</option>
-                    <option value="primary">Primary Education</option>
-                    <option value="secondary">Secondary Education</option>
-                    <option value="diploma">Diploma</option>
-                    <option value="bachelor">Bachelor's Degree</option>
-                    <option value="master">Master's Degree</option>
-                    <option value="phd">PhD/Doctorate</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Institution Name
-                  </label>
-                  <input
-                    type="text"
-                    name="institutionName"
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                    value={formData.institutionName}
-                    onChange={handleChange}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Year of Completion
-                  </label>
-                  <input
-                    type="number"
-                    name="yearOfCompletion"
-                    min="1900"
-                    max={new Date().getFullYear()}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                    value={formData.yearOfCompletion}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Skills/Qualifications
-                </label>
-                <textarea
-                  name="skills"
-                  rows={3}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                  value={formData.skills}
-                  onChange={handleChange}
-                  placeholder="List your skills and qualifications, separated by commas"
-                />
               </div>
             </>
           )}

@@ -84,28 +84,6 @@ export default function DashboardPage() {
   const [isMembershipLoading, setIsMembershipLoading] = useState(false);
 
   useEffect(() => {
-    const testDirectAPI = async () => {
-      try {
-        console.log('🔍 Testing direct /api/auth/me call...');
-        const response = await fetch('/api/auth/me', { credentials: 'include' });
-        if (response.ok) {
-          const data = await response.json();
-          console.log('🔍 Direct API result:', data);
-          console.log('🔍 Direct API membershipNumber:', data.membershipNumber);
-        } else {
-          console.log('🔍 Direct API failed:', response.status);
-        }
-      } catch (error) {
-        console.error('🔍 Direct API error:', error);
-      }
-    };
-    
-    if (isAuthenticated) {
-      testDirectAPI();
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/auth/login');
     }
@@ -113,8 +91,29 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (user) {
+      console.log('🔍 Dashboard - useEffect triggered with user:', user);
+      console.log('🔍 Dashboard - user.membershipNumber:', user.membershipNumber);
+      console.log('🔍 Dashboard - typeof user.membershipNumber:', typeof user.membershipNumber);
+      console.log('🔍 Dashboard - user keys:', Object.keys(user));
+      
       const completion = calculateProfileCompletion(user);
       setProfileCompletion(completion);
+      
+      // Set membership status from user object (only available properties)
+      setMembershipStatus({
+        success: true,
+        membership: {
+          membershipNumber: user.membershipNumber || 'N/A',
+          membershipType: 'personal', // Default value since not in User type
+          status: user.isApproved ? 'active' : 'pending',
+          paymentStatus: 'unknown', // Default value since not in User type
+          joinedDate: 'unknown', // Default value since not in User type
+          expiryDate: 'unknown', // Default value since not in User type
+          amountPaid: 'unknown' // Default value since not in User type
+        }
+      });
+    } else {
+      console.log('🔍 Dashboard - useEffect triggered but user is null/undefined');
     }
   }, [user]);
 
@@ -252,10 +251,7 @@ export default function DashboardPage() {
                   <div className="bg-gray-50 rounded-md p-4">
                     <div className="text-xs text-gray-500">Membership #</div>
                     <div className="text-lg font-semibold text-gray-900">
-                      {(() => {
-                        const displayNumber = membershipStatus.membership?.membershipNumber || user?.membershipNumber || 'N/A';
-                        return displayNumber;
-                      })()}
+                      {user?.membershipNumber || 'N/A'}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">Expiry: {membershipStatus.membership?.expiryDate || membershipStatus.cycle?.expiryDate}</div>
                   </div>

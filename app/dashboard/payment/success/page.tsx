@@ -26,7 +26,7 @@ export default function PaymentSuccessPage() {
         setMessage('Test payment successful! Your membership has been activated.');
         
         // For test payments, activate membership via server action
-        activateTestMembership(referenceParam);
+        activateTestMembership(referenceParam, referenceParam);
       } else {
         // Real payment - check status
         checkPaymentStatus(referenceParam);
@@ -49,10 +49,15 @@ export default function PaymentSuccessPage() {
         credentials: 'include',
       });
       
-      if (response.ok) {
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
         console.log('Test membership activated for reference:', ref);
+        console.log('Membership number:', data.data?.membershipNumber);
       } else {
-        console.error('Failed to activate test membership');
+        console.error('Failed to activate test membership:', data.error || 'Unknown error');
+        console.error('Response status:', response.status);
+        console.error('Response data:', data);
       }
     } catch (error) {
       console.error('Error activating test membership:', error);

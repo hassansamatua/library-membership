@@ -103,40 +103,98 @@ export async function POST(req: Request) {
 
       const userId = result.insertId;
 
+      // Prepare profile data in the format expected by the admin API
+      const personalInfo = {
+        fullName: formData.name,
+        gender: formData.gender || '',
+        dateOfBirth: formData.dateOfBirth || '',
+        nationality: formData.country || 'Tanzania',
+        placeOfBirth: ''
+      };
+
+      const contactInfo = {
+        phone: formData.phoneNumber || '',
+        address: formData.street ? `${formData.street}${formData.houseNumber ? ' ' + formData.houseNumber : ''}` : '',
+        city: formData.district || '',
+        country: formData.country || 'Tanzania',
+        postalCode: formData.postalCode || '',
+        socialMedia: {}
+      };
+
+      const educationInfo = {
+        educationLevel: formData.educationLevel || '',
+        institutionName: formData.institutionName || '',
+        yearOfCompletion: formData.yearOfCompletion || '',
+        skills: formData.skills || ''
+      };
+
+      const employmentInfo = {
+        occupation: formData.occupation || '',
+        employer: formData.employerName || '',
+        workAddress: formData.workAddress || '',
+        workPhone: formData.workPhone || '',
+        workEmail: formData.workEmail || '',
+        yearsOfExperience: formData.yearsOfExperience || ''
+      };
+
       // Prepare profile data for user_profiles table
       const profileData = {
         user_id: userId,
+        // Flattened fields for backward compatibility
         date_of_birth: formData.dateOfBirth || null,
         gender: formData.gender || null,
-        address: formData.street ? `${formData.street}${formData.houseNumber ? ' ' + formData.houseNumber : ''}` : null,
+        address: contactInfo.address || null,
         city: formData.district || null,
         state: formData.region || null,
         country: formData.country || 'Tanzania',
         postal_code: formData.postalCode || null,
         job_title: formData.occupation || null,
-        current_position: null,
-        industry: formData.employerName || null,
-        years_of_experience: null,
+        current_position: formData.occupation || null,
+        company: formData.employerName || null,
+        years_of_experience: formData.yearsOfExperience || null,
         skills: formData.skills || null,
         highest_degree: formData.educationLevel || null,
-        field_of_study: null,
         institution: formData.institutionName || null,
         year_of_graduation: formData.yearOfCompletion || null,
-        additional_certifications: null,
-        areas_of_interest: null,
-        id_proof_path: null,
-        degree_certificates_path: null,
-        cv_path: null,
-        join_date: new Date().toISOString().split('T')[0]
+        work_email: formData.workEmail || null,
+        work_phone: formData.workPhone || null,
+        join_date: new Date().toISOString().split('T')[0],
+        // JSON fields
+        personal_info: JSON.stringify(personalInfo),
+        contact_info: JSON.stringify(contactInfo),
+        education: JSON.stringify(educationInfo),
+        employment: JSON.stringify(employmentInfo),
+        professional_info: JSON.stringify({
+          ...employmentInfo,
+          skills: formData.skills ? [formData.skills] : [] 
+        })
       };
+
+      // First, check if user_profiles table has the required columns
+      const [columns] = await connection.query<import('mysql2').RowDataPacket[]>(
+        'SHOW COLUMNS FROM user_profiles'
+      );
+      const columnNames = columns.map(col => col.Field);
+      
+      // Filter out any fields that don't exist in the table
+      const validProfileData = Object.entries(profileData).reduce((acc, [key, value]) => {
+        if (columnNames.includes(key)) {
+          acc[key] = value;
+        } else {
+          console.warn(`Column '${key}' does not exist in user_profiles table`);
+        }
+        return acc;
+      }, {} as Record<string, any>);
 
       // Insert into user_profiles table
       await connection.query(
         `INSERT INTO user_profiles 
-         (${Object.keys(profileData).join(', ')})
-         VALUES (${Object.keys(profileData).map(() => '?').join(', ')})`,
-        Object.values(profileData)
+         (${Object.keys(validProfileData).join(', ')})
+         VALUES (${Object.keys(validProfileData).map(() => '?').join(', ')})`,
+        Object.values(validProfileData)
       );
+      
+      console.log('Profile data saved successfully:', JSON.stringify(validProfileData, null, 2));
 
       // Commit the transaction
       await connection.commit();

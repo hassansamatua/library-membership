@@ -77,15 +77,47 @@ export async function GET(
     console.log('Profile columns:', Array.from(profileColumnSet));
 
     // Build SELECT clause based on available columns
-    const selectFields = [];
-    if (profileColumnSet.has('personal_info')) selectFields.push('personal_info');
-    if (profileColumnSet.has('contact_info')) selectFields.push('contact_info');
-    if (profileColumnSet.has('professional_info')) selectFields.push('professional_info');
-    if (profileColumnSet.has('membership_info')) selectFields.push('membership_info');
-    if (profileColumnSet.has('membership_type')) selectFields.push('membership_type');
-    if (profileColumnSet.has('membership_number')) selectFields.push('membership_number');
-    if (profileColumnSet.has('membership_status')) selectFields.push('membership_status');
-    if (profileColumnSet.has('join_date')) selectFields.push('join_date');
+    const selectFields = [
+      'personal_info',
+      'contact_info',
+      'professional_info',
+      'membership_info',
+      'membership_type',
+      'membership_number',
+      'membership_status',
+      'join_date',
+      'education',
+      'employment',
+      'highest_degree',
+      'institution',
+      'year_of_graduation',
+      'skills',
+      'job_title',
+      'current_position',
+      'company',
+      'work_email',
+      'work_phone',
+      'work_address',
+      'years_of_experience',
+      // Personal flat columns
+      'gender',
+      'date_of_birth',
+      'nationality',
+      'place_of_birth',
+      'profile_picture',
+      // Contact flat columns
+      'phone',
+      'address',
+      'city',
+      'state',
+      'postal_code',
+      'country',
+      'facebook',
+      'twitter',
+      'linkedin',
+      'instagram',
+      'github'
+    ].filter(field => profileColumnSet.has(field));
 
     const profileQuery = selectFields.length > 0 
       ? `SELECT ${selectFields.join(', ')} FROM user_profiles WHERE user_id = ?`
@@ -97,11 +129,51 @@ export async function GET(
 
     const profile = profiles[0] || {};
 
-    // Parse JSON fields
-    const personalInfo = profile.personal_info ? JSON.parse(profile.personal_info) : {};
-    const contactInfo = profile.contact_info ? JSON.parse(profile.contact_info) : {};
-    const professionalInfo = profile.professional_info ? JSON.parse(profile.professional_info) : {};
-    const membershipInfo = profile.membership_info ? JSON.parse(profile.membership_info) : {};
+    // Debug: Log all available profile data
+    console.log('All profile fields from database:', Object.keys(profile));
+    console.log('Profile data values:', profile);
+
+    // Parse JSON fields with error handling
+    const safeJsonParse = (jsonString: any) => {
+      if (!jsonString) return {};
+      if (typeof jsonString === 'object') return jsonString;
+      try {
+        return JSON.parse(jsonString);
+      } catch (e) {
+        console.error('Error parsing JSON:', e, 'String was:', jsonString);
+        return {};
+      }
+    };
+
+    // Parse all JSON fields, handling both stringified JSON and already-parsed objects
+    const personalInfo = safeJsonParse(profile.personal_info || {});
+    const contactInfo = safeJsonParse(profile.contact_info || {});
+    const professionalInfo = safeJsonParse(profile.professional_info || {});
+    const membershipInfo = safeJsonParse(profile.membership_info || {});
+    
+    // Handle education and employment which might be arrays or objects
+    let educationInfo = safeJsonParse(profile.education || {});
+    let employmentInfo = safeJsonParse(profile.employment || {});
+    
+    // If education is an array, use the first item (most recent)
+    if (Array.isArray(educationInfo) && educationInfo.length > 0) {
+      educationInfo = educationInfo[0];
+    }
+    
+    // If employment is an array, use the first item (current employment)
+    if (Array.isArray(employmentInfo) && employmentInfo.length > 0) {
+      employmentInfo = employmentInfo[0];
+    }
+    
+    // Log the raw profile data for debugging
+    console.log('Raw profile data:', {
+      profile,
+      personalInfo,
+      contactInfo,
+      professionalInfo,
+      educationInfo,
+      employmentInfo
+    });
 
     // Also check direct columns for membership info
     const membershipType = profile.membership_type || membershipInfo.membershipType || membershipInfo.membership_type || 'personal';
@@ -195,41 +267,81 @@ export async function GET(
       ...user,
       membership_number: finalMembershipNumber,
       profile: {
+        // Personal Information - prioritize JSON personalInfo, then flattened fields
         personalInfo: {
-          fullName: personalInfo.fullName || profile.name || user.name,
+          fullName: personalInfo.fullName || personalInfo.name || profile.name || user.name || '',
           gender: personalInfo.gender || profile.gender || '',
           dateOfBirth: personalInfo.dateOfBirth || personalInfo.date_of_birth || profile.date_of_birth || '',
           nationality: personalInfo.nationality || profile.nationality || '',
-          placeOfBirth: personalInfo.placeOfBirth || profile.place_of_birth || '',
-          profilePicture: personalInfo.profilePicture || profile.profile_picture || ''
+          placeOfBirth: personalInfo.placeOfBirth || personalInfo.place_of_birth || profile.place_of_birth || '',
+          profilePicture: personalInfo.profilePicture || personalInfo.profile_picture || profile.profile_picture || ''
         },
+        
+        // Contact Information - prioritize JSON contactInfo, then flattened fields
         contactInfo: {
           phone: contactInfo.phone || profile.phone || '',
           address: contactInfo.address || profile.address || '',
           city: contactInfo.city || profile.city || '',
-          country: contactInfo.country || profile.country || '',
-          postalCode: contactInfo.postalCode || profile.postal_code || '',
-          socialMedia: contactInfo.socialMedia || {
-            facebook: profile.facebook || '',
-            twitter: profile.twitter || '',
-            linkedin: profile.linkedin || '',
-            instagram: profile.instagram || ''
+          state: contactInfo.state || profile.state || '',
+          country: contactInfo.country || profile.country || 'Tanzania',
+          postalCode: contactInfo.postalCode || contactInfo.postal_code || profile.postal_code || '',
+          email: contactInfo.email || user.email || '',
+          socialMedia: {
+            facebook: contactInfo.facebook || profile.facebook || '',
+            twitter: contactInfo.twitter || profile.twitter || '',
+            linkedin: contactInfo.linkedin || profile.linkedin || '',
+            instagram: contactInfo.instagram || profile.instagram || '',
+            github: contactInfo.github || profile.github || ''
           }
         },
-        professionalInfo: professionalInfo || {
-          occupation: profile.job_title || profile.current_position || '',
-          employer: profile.company || '',
-          workEmail: profile.work_email || '',
-          yearsOfExperience: profile.years_of_experience || '',
-          skills: profile.skills ? (Array.isArray(profile.skills) ? profile.skills : []) : []
+        
+        // Academic Information
+        academicInfo: {
+          educationLevel: educationInfo.educationLevel || educationInfo.highestDegree || educationInfo.degree || profile.highest_degree || '',
+          institutionName: educationInfo.institutionName || educationInfo.institution || educationInfo.school || profile.institution || '',
+          yearOfCompletion: educationInfo.yearOfCompletion || educationInfo.yearOfGraduation || educationInfo.graduationYear || educationInfo.year_of_graduation || profile.year_of_graduation || '',
+          fieldOfStudy: educationInfo.fieldOfStudy || educationInfo.major || educationInfo.field_of_study || educationInfo.specialization || profile.field_of_study || '',
+          skills: educationInfo.skills || educationInfo.technicalSkills || (typeof profile.skills === 'string' ? profile.skills : '') || (Array.isArray(profile.skills) ? profile.skills.join(', ') : '') || '',
+          additionalCertifications: educationInfo.additionalCertifications || educationInfo.certifications || profile.additional_certifications || ''
         },
+        
+        // Professional Information
+        professionalInfo: {
+          occupation: professionalInfo.occupation || employmentInfo.occupation || profile.job_title || profile.current_position || '',
+          employer: professionalInfo.employer || employmentInfo.company || profile.company || '',
+          workAddress: professionalInfo.workAddress || professionalInfo.work_address || employmentInfo.workAddress || '',
+          workPhone: professionalInfo.workPhone || professionalInfo.work_phone || profile.work_phone || '',
+          workEmail: professionalInfo.workEmail || professionalInfo.work_email || profile.work_email || '',
+          jobTitle: professionalInfo.jobTitle || employmentInfo.jobTitle || profile.job_title || '',
+          currentPosition: professionalInfo.currentPosition || employmentInfo.currentPosition || profile.current_position || '',
+          industry: professionalInfo.industry || employmentInfo.industry || profile.industry || '',
+          yearsOfExperience: professionalInfo.yearsOfExperience || professionalInfo.years_of_experience || 
+                            employmentInfo.yearsOfExperience || profile.years_of_experience || '',
+          skills: [
+            ...(professionalInfo.skills || []),
+            ...(employmentInfo.skills || []),
+            ...(profile.skills ? (Array.isArray(profile.skills) ? profile.skills : [profile.skills]) : [])
+          ].filter((value, index, self) => value && self.indexOf(value) === index) // Remove duplicates
+        },
+        
+        // Employment Information (legacy, will be merged with professionalInfo in the future)
+        employmentInfo: {
+          currentJobTitle: employmentInfo.currentJobTitle || employmentInfo.jobTitle || employmentInfo.occupation || profile.job_title || profile.current_position || '',
+          currentCompany: employmentInfo.currentCompany || employmentInfo.company || profile.company || '',
+          currentIndustry: employmentInfo.currentIndustry || employmentInfo.industry || profile.industry || '',
+          workExperience: employmentInfo.workExperience || employmentInfo.yearsOfExperience || profile.years_of_experience || '',
+          workAddress: employmentInfo.workAddress || employmentInfo.work_address || profile.work_address || profile.address || '',
+          workPhone: employmentInfo.workPhone || employmentInfo.work_phone || profile.work_phone || profile.phone || '',
+          workEmail: employmentInfo.workEmail || employmentInfo.work_email || profile.work_email || user.email || ''
+        },
+        
+        // Membership Information
         membership: {
-          ...membershipInfo,
-          membershipType: finalMembershipType || '',
-          membershipNumber: finalMembershipNumber || '',
-          membershipStatus: finalMembershipStatus || '',
-          joinDate: joinDate || '',
-          expiryDate: finalExpiryDate || ''
+          membershipType: membershipInfo.membershipType || profile.membership_type || finalMembershipType || '',
+          membershipNumber: membershipInfo.membershipNumber || profile.membership_number || finalMembershipNumber || '',
+          membershipStatus: membershipInfo.membershipStatus || profile.membership_status || finalMembershipStatus || '',
+          joinDate: membershipInfo.joinDate || profile.join_date || joinDate || '',
+          expiryDate: membershipInfo.expiryDate || membershipInfo.membership_expiry || profile.membership_expiry || finalExpiryDate || ''
         }
       }
     };

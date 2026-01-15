@@ -51,6 +51,60 @@ function getPlanAmounts(args: { type: 'personal' | 'organization'; newUser: bool
   return { baseAmount: args.newUser ? 40000 : 30000 };
 }
 
+// NEW: Calculate penalties based on sophisticated rules
+function calculatePenalties(args: {
+  baseAmount: number;
+  dueDate: Date;
+  now: Date;
+  newUser: boolean;
+  registrationDate?: Date;
+}) {
+  const { baseAmount, dueDate, now, newUser, registrationDate } = args;
+  
+  // NEW USERS: No penalties for entire first cycle if registered in December
+  if (newUser && registrationDate) {
+    const regMonth = registrationDate.getMonth();
+    const regYear = registrationDate.getFullYear();
+    const currentYear = now.getFullYear();
+    
+    // If registered in December of previous year, no penalties for entire first cycle
+    if (regMonth === 11 && regYear === currentYear - 1) {
+      return { penaltyAmount: 0, totalDue: baseAmount, penaltyMonths: 0 };
+    }
+    
+    // For new users, check if they're still in their first payment cycle
+    // First cycle runs from registration date until March 31 of next year
+    const firstCycleEnd = new Date(regYear + 1, 2, 31); // March 31 of registration year
+    const isInFirstCycle = now.getTime() <= firstCycleEnd.getTime();
+    
+    if (isInFirstCycle) {
+      return { penaltyAmount: 0, totalDue: baseAmount, penaltyMonths: 0 };
+    }
+  }
+  
+  // Calculate months overdue
+  const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+  const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  // Grace period: Jan 1 - March 30 (no penalties)
+  const gracePeriodEnd = new Date(dueDate.getFullYear(), 2, 30); // March 30
+  const isAfterGracePeriod = nowDateOnly.getTime() > gracePeriodEnd.getTime();
+  
+  if (!isAfterGracePeriod) {
+    return { penaltyAmount: 0, totalDue: baseAmount, penaltyMonths: 0 };
+  }
+  
+  // After April 1: TSH 1,000 per month penalty (12,000 per year)
+  const monthsOverdue = Math.max(0, Math.floor((nowDateOnly.getTime() - dueDateOnly.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+  const penaltyAmount = monthsOverdue * 1000; // TSH 1,000 per month (12,000 per year)
+  
+  return {
+    penaltyAmount,
+    totalDue: baseAmount + penaltyAmount,
+    penaltyMonths: monthsOverdue
+  };
+}
+
 export async function GET(request: Request) {
   let connection;
   try {
@@ -71,7 +125,7 @@ export async function GET(request: Request) {
     connection = await pool.getConnection();
 
     const [userRows] = await connection.query<RowDataPacket[]>(
-      'SELECT id, membership_type FROM users WHERE id = ?',
+      'SELECT id, membership_type, created_at FROM users WHERE id = ?',
       [decoded.id]
     );
 
@@ -85,6 +139,9 @@ export async function GET(request: Request) {
     const type: 'personal' | 'organization' = typeParam === 'organization' ? 'organization' : 'personal';
     const now = new Date();
     const cycle = getCycleDates(now);
+    
+    // Get user registration date for new user grace period calculation
+    const registrationDate = new Date((userRows[0] as any).created_at);
 
     const [membershipRows] = await connection.query<MembershipRow[]>(
       'SELECT * FROM memberships WHERE user_id = ? ORDER BY expiry_date DESC LIMIT 1',
@@ -94,6 +151,15 @@ export async function GET(request: Request) {
     const membership = membershipRows?.[0] || null;
     const hasMembership = !!membership;
 
+    // NEW: Check for completed payment in membership_payments table
+    const [paymentRows] = await connection.query(
+      'SELECT * FROM membership_payments WHERE user_id = ? AND status = "completed" ORDER BY payment_date DESC LIMIT 1',
+      [decoded.id]
+    ) as any[];
+
+    const completedPayment = paymentRows?.[0] || null;
+    const hasCompletedPayment = !!completedPayment;
+
     const newUser = newUserParam != null
       ? newUserParam === 'true' || newUserParam === '1'
       : !hasMembership;
@@ -101,14 +167,17 @@ export async function GET(request: Request) {
     const planType = typeParam === 'personal' || typeParam === 'organization' ? type : defaultType;
     const { baseAmount } = getPlanAmounts({ type: planType, newUser });
 
-    const dueDateOnly = new Date(cycle.dueDate.getFullYear(), cycle.dueDate.getMonth(), cycle.dueDate.getDate());
-    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const overdue = nowDateOnly.getTime() > dueDateOnly.getTime();
-    const penaltyAmount = overdue ? Math.round(baseAmount * 0.1) : 0;
-    const totalDue = baseAmount + penaltyAmount;
+    // NEW: Use sophisticated penalty calculation
+    const { penaltyAmount, totalDue, penaltyMonths } = calculatePenalties({
+      baseAmount,
+      dueDate: cycle.dueDate,
+      now,
+      newUser,
+      registrationDate
+    });
 
     const membershipExpiry = membership?.expiry_date ? new Date(membership.expiry_date) : null;
-    const activeByDate = membershipExpiry ? membershipExpiry.getTime() >= nowDateOnly.getTime() : false;
+    const activeByDate = membershipExpiry ? membershipExpiry.getTime() >= now.getTime() : false;
     const paid = membership?.payment_status === 'paid';
     // Check if user has profile picture
     const [profileRows] = await connection.query<RowDataPacket[]>(
@@ -119,7 +188,13 @@ export async function GET(request: Request) {
     const userProfile = profileRows[0] || {};
     const hasProfilePicture = Boolean(userProfile.profile_picture && userProfile.profile_picture !== '' && userProfile.profile_picture !== null);
 
-    const active = Boolean(membership?.status === 'active' && activeByDate && paid);
+    // NEW: Active status depends on completed payment and membership existence
+    const active = Boolean(
+      membership && 
+      membership.status === 'active' && 
+      activeByDate && 
+      hasCompletedPayment
+    );
 
     const effectiveFees = active
       ? { baseAmount: 0, penaltyAmount: 0, totalDue: 0, currency: 'TZS' }
@@ -138,6 +213,14 @@ export async function GET(request: Request) {
         newUser
       },
       fees: effectiveFees,
+      // NEW: Add penalty breakdown for transparency
+      penaltyBreakdown: {
+        penaltyMonths,
+        monthlyPenalty: 1000,
+        totalPenalty: penaltyAmount,
+        gracePeriod: 'Feb 1 - Mar 30',
+        penaltyPeriod: 'Apr 1 onwards'
+      },
       membership: membership
         ? {
             membershipNumber: membership.membership_number,
@@ -149,7 +232,7 @@ export async function GET(request: Request) {
             amountPaid: membership.amount_paid
           }
         : null,
-      canAccessIdCard: active
+      canAccessIdCard: hasCompletedPayment
     });
   } catch (error) {
     if ((error as any)?.code === 'ER_NO_SUCH_TABLE') {

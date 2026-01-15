@@ -128,17 +128,17 @@ export async function updateMembershipPayment(paymentData: {
           );
         }
 
-        // Update user membership info in JSON
+        // Create payment record in membership_payments table
+        const currentYear = new Date().getFullYear();
         await connection.query(
-          `UPDATE users SET 
-           membership_info = JSON_SET(
-             JSON_SET(membership_info, '$.membership.membershipNumber', ?),
-             '$.membership.membershipType', ?,
-             '$.membership.membershipStatus', 'active',
-             '$.membership.paymentStatus', 'paid'
-           )
-           WHERE id = ?`,
-          [membershipNumber, membership_type, user_id]
+          `INSERT INTO membership_payments 
+           (user_id, amount, payment_method, reference, 
+            payment_date, status, cycle_year)
+           VALUES (?, ?, ?, ?, NOW(), 'completed', ?)
+           ON DUPLICATE KEY UPDATE
+             status = 'completed',
+             updated_at = NOW()`,
+          [user_id, paymentData.amount, paymentData.paymentMethod, paymentData.reference, currentYear]
         );
       }
     }

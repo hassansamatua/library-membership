@@ -22,6 +22,14 @@ $data = json_decode(file_get_contents('php://input'));
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (password_verify($data->password, $row['password'])) {
+            
+            // Check if user is approved
+            if (!$row['is_approved']) {
+                http_response_code(403);
+                echo json_encode(['message' => 'Account pending approval']);
+                exit();
+            }
+            
             $token = generateJWT([
                 'id' => $row['id'],
                 'email' => $row['email'],

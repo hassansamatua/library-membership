@@ -50,12 +50,29 @@ interface UserDetail {
         instagram?: string;
       };
     };
+    academicInfo?: {
+      educationLevel?: string;
+      institutionName?: string;
+      yearOfCompletion?: string;
+      fieldOfStudy?: string;
+      skills?: string;
+      additionalCertifications?: string;
+    };
     professionalInfo?: {
       occupation?: string;
       employer?: string;
       workEmail?: string;
       yearsOfExperience?: string;
       skills?: string[];
+    };
+    employmentInfo?: {
+      currentJobTitle?: string;
+      currentCompany?: string;
+      currentIndustry?: string;
+      workExperience?: string;
+      workAddress?: string;
+      workPhone?: string;
+      workEmail?: string;
     };
     membership?: {
       membershipType?: string;
@@ -375,6 +392,74 @@ const response = await fetch(`/api/admin/users/${resolvedParams.id}/reject`, {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
                         <p className="text-gray-900">{userDetail.profile.membership.expiryDate || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {userDetail.profile.academicInfo && (
+                  <div>
+                    <h3 className="text-md font-medium text-gray-800 mb-2">Academic Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Highest Degree</label>
+                        <p className="text-gray-900">{userDetail.profile.academicInfo.educationLevel || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Institution</label>
+                        <p className="text-gray-900">{userDetail.profile.academicInfo.institutionName || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Field of Study</label>
+                        <p className="text-gray-900">{userDetail.profile.academicInfo.fieldOfStudy || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Year of Completion</label>
+                        <p className="text-gray-900">{userDetail.profile.academicInfo.yearOfCompletion || 'N/A'}</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Skills</label>
+                        <p className="text-gray-900">{userDetail.profile.academicInfo.skills || 'N/A'}</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Additional Certifications</label>
+                        <p className="text-gray-900">{userDetail.profile.academicInfo.additionalCertifications || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {userDetail.profile.employmentInfo && (
+                  <div>
+                    <h3 className="text-md font-medium text-gray-800 mb-2">Employment Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Current Job Title</label>
+                        <p className="text-gray-900">{userDetail.profile.employmentInfo.currentJobTitle || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Current Company</label>
+                        <p className="text-gray-900">{userDetail.profile.employmentInfo.currentCompany || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+                        <p className="text-gray-900">{userDetail.profile.employmentInfo.currentIndustry || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Work Experience</label>
+                        <p className="text-gray-900">{userDetail.profile.employmentInfo.workExperience || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Work Email</label>
+                        <p className="text-gray-900">{userDetail.profile.employmentInfo.workEmail || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Work Phone</label>
+                        <p className="text-gray-900">{userDetail.profile.employmentInfo.workPhone || 'N/A'}</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Work Address</label>
+                        <p className="text-gray-900">{userDetail.profile.employmentInfo.workAddress || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
