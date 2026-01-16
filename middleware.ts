@@ -22,12 +22,14 @@ export async function middleware(request: NextRequest) {
   
   console.log(`[Middleware] Path: ${pathname}, Has Token: ${!!token}`);
 
-  // Allow auth routes (except protected ones) and API routes
+  // Allow public routes, auth routes, and API routes
   if (pathname.startsWith('/api') || 
       pathname === '/auth/login' || 
       pathname === '/auth/register' ||
       pathname === '/auth/forgot-password' ||
-      pathname === '/auth/pending-approval') {
+      pathname === '/auth/pending-approval' ||
+      pathname === '/terms' ||
+      pathname === '/privacy') {
     console.log(`[Middleware] Allowing access to: ${pathname}`);
     return NextResponse.next();
   }

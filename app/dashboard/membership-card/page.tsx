@@ -62,7 +62,7 @@ export default function MembershipCardPage() {
     loadMembershipStatus();
   }, [refreshKey]);
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     // Prevent multiple downloads
     if (downloadInProgress) {
       console.log('⚠️ Download already in progress, ignoring...');
@@ -71,29 +71,79 @@ export default function MembershipCardPage() {
     setDownloadInProgress(true);
     
     console.log('🎨 Starting card download...');
-    // Create a canvas element to generate the card as an image
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      console.error('❌ Failed to get canvas context');
+    
+    try {
+      // Get the card element to clone
+      const cardElement = document.querySelector('.membership-card') as HTMLElement;
+      if (!cardElement) {
+        throw new Error('Card element not found');
+      }
+      
+      // Create a temporary container for the card
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'fixed';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '0';
+      tempContainer.style.width = '85.6mm';
+      tempContainer.style.height = '53.98mm';
+      tempContainer.style.overflow = 'hidden';
+      document.body.appendChild(tempContainer);
+      
+      // Clone the card and apply necessary styles
+      const cardClone = cardElement.cloneNode(true) as HTMLElement;
+      cardClone.style.width = '100%';
+      cardClone.style.height = '100%';
+      cardClone.style.transform = 'none';
+      cardClone.style.position = 'relative';
+      cardClone.style.boxSizing = 'border-box';
+      
+      // Add to temporary container
+      tempContainer.appendChild(cardClone);
+      
+      // Force a reflow to ensure styles are applied
+      void tempContainer.offsetHeight;
+      
+      // Use html2canvas to capture the card
+      const html2canvas = (await import('html2canvas')).default;
+      
+      const canvas = await html2canvas(cardClone, {
+        scale: 3, // Higher scale for better quality
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        logging: true,
+        width: tempContainer.offsetWidth,
+        height: tempContainer.offsetHeight,
+        windowWidth: tempContainer.scrollWidth,
+        windowHeight: tempContainer.scrollHeight,
+        scale: 4, // Even higher DPI for better print quality
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        logging: true,
+        removeContainer: true
+      });
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.download = `membership-card-${membershipStatus?.membership?.membershipNumber || 'card'}.png`;
+      link.href = canvas.toDataURL('image/png', 1.0);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error('❌ Error generating card image:', error);
+      // Show error to user
+      alert('Failed to download membership card. Please try again.');
+    } finally {
+      // Clean up
+      const tempContainer = document.querySelector('div[style*="left: -9999px"]');
+      if (tempContainer) {
+        document.body.removeChild(tempContainer);
+      }
       setDownloadInProgress(false);
-      return;
     }
-
-    console.log('✅ Canvas context created');
-    // Set canvas size (credit card dimensions: 85.6mm × 53.98mm)
-    canvas.width = 856; // 10x scale for better quality
-    canvas.height = 540;
-
-    // Enable color preservation for download
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.globalCompositeOperation = 'source-over';
-
-    // Draw card background with exact green-700 gradient matching screen
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, '#15803d'); // green-700 (exact match)
-    gradient.addColorStop(0.5, '#16a34a'); // green-600 (exact match)
     gradient.addColorStop(1, '#166534'); // green-800 (exact match)
     ctx.fillStyle = gradient;
     

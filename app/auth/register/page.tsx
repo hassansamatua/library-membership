@@ -41,7 +41,7 @@ const TANZANIA_DISTRICTS: Record<string, string[]> = {
 const TANZANIA_REGIONS = Object.keys(TANZANIA_DISTRICTS);
 
 export default function RegisterPage() {
-  type MembershipType = 'personal' | 'organization';
+  type MembershipType = 'librarian' | 'regular' | 'organization';
 
   const [formData, setFormData] = useState({
     name: "",
@@ -49,9 +49,11 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
     nida: "",
-    membershipType: "personal" as MembershipType,
+    membershipType: "regular" as MembershipType,
     phoneNumber: "",
     organizationName: "",
+    contactPersonName: "",
+    contactPersonEmail: "",
     // New fields
     dateOfBirth: "",
     gender: "",
@@ -72,9 +74,8 @@ export default function RegisterPage() {
     institutionName: "",
     yearOfCompletion: "",
     skills: "",
-    membershipCategory: "regular", // regular, student, honorary, etc.
     membershipNumber: "", // Auto-generated
-    membershipDate: new Date().toISOString().split('T')[0], // Automatically set to current date // Automatically set to current date
+    membershipDate: new Date().toISOString().split('T')[0],
     agreeToTerms: false,
     agreeToDataProcessing: false
   });
@@ -93,8 +94,12 @@ export default function RegisterPage() {
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
-      // Clear organization name when switching to personal membership
-      ...(name === 'membershipType' && value === 'personal' ? { organizationName: '' } : {})
+      // Clear organization name when not organization type
+      ...(name === 'membershipType' && value !== 'organization' ? { 
+        organizationName: '',
+        contactPersonName: '',
+        contactPersonEmail: ''
+      } : {})
     }));
   };
 
@@ -141,6 +146,14 @@ export default function RegisterPage() {
       return;
     }
 
+    // Check required organization fields if organization type
+    if (formData.membershipType === 'organization') {
+      if (!formData.contactPersonName || !formData.contactPersonEmail) {
+        setError("Please fill in all required organization information (Contact Person Name and Email)");
+        return;
+      }
+    }
+
     if (!formData.agreeToTerms || !formData.agreeToDataProcessing) {
       setError("You must agree to terms and conditions and data processing policy");
       return;
@@ -149,16 +162,20 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // Prepare data to send to API
+      // Prepare data to send to API with explicit type assertion
       const userData = {
         ...formData,
+        // For organization, use organization name as the name
+        name: formData.membershipType === 'organization' ? formData.organizationName : formData.name,
         // Use trimmed password from form
         password: trimmedPassword,
         // Send confirmPassword for server-side validation
         confirmPassword: trimmedConfirmPassword,
         // Remove checkboxes from data sent to server
         agreeToTerms: undefined,
-        agreeToDataProcessing: undefined
+        agreeToDataProcessing: undefined,
+        // Ensure membershipType is explicitly typed
+        membershipType: formData.membershipType as 'librarian' | 'regular' | 'organization'
       };
 
       await register(userData);
@@ -203,17 +220,101 @@ export default function RegisterPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Full Name <span className="text-red-500">*</span>
+                    Membership Type <span className="text-red-500">*</span>
+                  </label>
+                  <div className="mt-1 space-y-2">
+                    <div className="flex items-center">
+                      <input
+                        id="membershipTypeRegular"
+                        name="membershipType"
+                        type="radio"
+                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
+                        value="regular"
+                        checked={formData.membershipType === 'regular'}
+                        onChange={handleChange}
+                      />
+                      <label htmlFor="membershipTypeRegular" className="ml-2 block text-sm text-gray-700">
+                        Regular (Student/Individual) - 40,000 TZS
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        id="membershipTypeLibrarian"
+                        name="membershipType"
+                        type="radio"
+                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
+                        value="librarian"
+                        checked={formData.membershipType === 'librarian'}
+                        onChange={handleChange}
+                      />
+                      <label htmlFor="membershipTypeLibrarian" className="ml-2 block text-sm text-gray-700">
+                        Librarian - 40,000 TZS
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        id="membershipTypeOrganization"
+                        name="membershipType"
+                        type="radio"
+                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
+                        value="organization"
+                        checked={formData.membershipType === 'organization'}
+                        onChange={handleChange}
+                      />
+                      <label htmlFor="membershipTypeOrganization" className="ml-2 block text-sm text-gray-700">
+                        Organization - 150,000 TZS
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    {formData.membershipType === 'organization' ? 'Organization Name' : 'Full Name'} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    name="name"
+                    name={formData.membershipType === 'organization' ? 'organizationName' : 'name'}
                     required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                    value={formData.name}
+                    value={formData.membershipType === 'organization' ? formData.organizationName : formData.name}
                     onChange={handleChange}
+                    placeholder={formData.membershipType === 'organization' ? 'Enter organization name' : 'Enter your full name'}
                   />
                 </div>
+                
+                {/* Organization Contact Person Fields (only show for organization type) */}
+                {formData.membershipType === 'organization' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Contact Person Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="contactPersonName"
+                        required
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        value={formData.contactPersonName || ''}
+                        onChange={handleChange}
+                        placeholder="Contact person's full name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Contact Person Email <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        name="contactPersonEmail"
+                        required
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        value={formData.contactPersonEmail || ''}
+                        onChange={handleChange}
+                        placeholder="Contact person's email address"
+                      />
+                    </div>
+                  </>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Date of Birth <span className="text-red-500">*</span>
@@ -622,22 +723,6 @@ export default function RegisterPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Membership Category <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="membershipCategory"
-                    required
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                    value={formData.membershipCategory}
-                    onChange={handleChange}
-                  >
-                    <option value="personal">Personal</option>
-                    <option value="organization">Organization</option>
-                    
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
                     Membership Number
                   </label>
                   <input
@@ -681,7 +766,11 @@ export default function RegisterPage() {
               </div>
               <div className="ml-3 text-sm">
                 <label htmlFor="agreeToTerms" className="font-medium text-gray-700">
-                  I agree to the <a href="/terms" className="text-green-600 hover:text-green-500">Terms and Conditions</a> <span className="text-red-500">*</span>
+                  I agree to the{' '}
+                  <Link href="/terms" className="text-green-600 hover:text-green-500" target="_blank" rel="noopener noreferrer">
+                    Terms and Conditions
+                  </Link>{' '}
+                  <span className="text-red-500">*</span>
                 </label>
               </div>
             </div>
@@ -700,7 +789,11 @@ export default function RegisterPage() {
               </div>
               <div className="ml-3 text-sm">
                 <label htmlFor="agreeToDataProcessing" className="font-medium text-gray-700">
-                  I consent to the processing of my personal data in accordance with the <a href="/privacy" className="text-green-600 hover:text-green-500">Privacy Policy</a> <span className="text-red-500">*</span>
+                  I consent to the processing of my personal data in accordance with the{' '}
+                  <Link href="/privacy" className="text-green-600 hover:text-green-500" target="_blank" rel="noopener noreferrer">
+                    Privacy Policy
+                  </Link>{' '}
+                  <span className="text-red-500">*</span>
                 </label>
               </div>
             </div>

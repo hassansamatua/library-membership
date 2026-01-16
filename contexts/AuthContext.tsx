@@ -83,9 +83,11 @@ interface AuthContextType {
     email: string;
     password: string;
     nida: string;
-    membershipType: 'personal' | 'organization';
+    membershipType: 'librarian' | 'regular' | 'organization';
     phoneNumber: string;
     organizationName?: string;
+    contactPersonName?: string;
+    contactPersonEmail?: string;
     [key: string]: any; // Allow additional fields
   }) => Promise<void>;
   logout: () => Promise<void>;
@@ -235,13 +237,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string;
     password: string;
     nida: string;
-    membershipType: 'personal' | 'organization';
+    membershipType: 'librarian' | 'regular' | 'organization';
     phoneNumber: string;
     organizationName?: string;
+    contactPersonName?: string;
+    contactPersonEmail?: string;
     [key: string]: any;
   }) => {
     try {
-      const { name, email, password, nida, membershipType, phoneNumber, organizationName, ...rest } = userData;
+      const { name, email, password, nida, membershipType, phoneNumber, organizationName, contactPersonName, contactPersonEmail, ...rest } = userData;
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

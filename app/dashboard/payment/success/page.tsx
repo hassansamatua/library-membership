@@ -41,18 +41,55 @@ export default function PaymentSuccessPage() {
   }, [searchParams]);
 
   const activateTestMembership = async (ref: string) => {
+    console.log('Starting test membership activation for reference:', ref);
+    
     try {
-      // For test payments, activate membership via server API
+      // First, ensure the test payment exists
+      console.log('Creating test payment...');
+      const createResponse = await fetch('/api/payments/create-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+        body: JSON.stringify({ reference: ref }),
+        credentials: 'include',
+      });
+
+      const createData = await createResponse.json();
+      console.log('Create test payment response:', {
+        status: createResponse.status,
+        ok: createResponse.ok,
+        data: createData
+      });
+
+      if (!createResponse.ok) {
+        console.error('Failed to create test payment:', createData.error || 'Unknown error');
+        return;
+      }
+
+      // Then activate the membership
+      console.log('Activating test membership...');
       const response = await fetch('/api/payments/activate-test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
         },
         body: JSON.stringify({ reference: ref }),
         credentials: 'include',
       });
       
-      const data = await response.json();
+      const data = await response.json().catch(e => {
+        console.error('Failed to parse JSON response:', e);
+        return { error: 'Invalid JSON response' };
+      });
+      
+      console.log('Activate test membership response:', {
+        status: response.status,
+        ok: response.ok,
+        data: data
+      });
       
       if (response.ok && data.success) {
         console.log('Test membership activated for reference:', ref);
@@ -61,6 +98,12 @@ export default function PaymentSuccessPage() {
         console.error('Failed to activate test membership:', data.error || 'Unknown error');
         console.error('Response status:', response.status);
         console.error('Response data:', data);
+        
+        // Try to get more details from the response text if JSON parsing failed
+        if (response.status >= 400) {
+          const text = await response.text().catch(() => 'Failed to read response text');
+          console.error('Raw response text:', text);
+        }
       }
     } catch (error) {
       console.error('Error activating test membership:', error);

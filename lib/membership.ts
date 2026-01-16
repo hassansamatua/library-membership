@@ -118,8 +118,8 @@ export async function updateMembershipPayment(paymentData: {
           
           await connection.query(
             `INSERT INTO memberships 
-             (user_id, membership_number, membership_type, status, payment_status, payment_date, amount_paid, join_date, expiry_date)
-             VALUES (?, ?, ?, 'active', 'paid', CURDATE(), ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 1 YEAR))`,
+             (user_id, membership_number, membership_type, status, payment_status, payment_date, amount_paid, created_at, expiry_date)
+             VALUES (?, ?, ?, 'active', 'paid', CURDATE(), ?, NOW(), DATE_ADD(CURDATE(), INTERVAL 1 YEAR))`,
             [user_id, membershipNumber, membership_type, paymentData.amount]
           );
         }
