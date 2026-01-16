@@ -32,14 +32,18 @@ export async function GET(request: NextRequest) {
 
     const connection = await pool.getConnection();
     try {
+      // First, get all upcoming events
       const [events] = await connection.query<RowDataPacket[]>(
         `SELECT e.*, 
                 (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = e.id) as current_attendees,
-                (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = e.id AND er.user_id = ?) as user_registered
+                (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = e.id AND er.user_id = ?) as user_registered,
+                CASE 
+                  WHEN (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = e.id) >= e.capacity THEN 'FULL'
+                  WHEN e.start_time < NOW() THEN 'PAST'
+                  ELSE 'UPCOMING'
+                END as event_status
          FROM events e
-         WHERE e.start_time >= NOW() 
-         AND e.status = 'upcoming'
-         AND (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = e.id) < e.capacity
+         WHERE e.status = 'upcoming'
          ORDER BY e.start_time ASC`,
         [userId]
       );

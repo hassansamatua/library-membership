@@ -209,6 +209,7 @@ export async function PUT(
     const capacityRaw = body?.maxAttendees ?? body?.max_attendees ?? body?.capacity ?? null;
     const capacityParsed = capacityRaw === null || capacityRaw === undefined || capacityRaw === '' ? null : Number(capacityRaw);
     const capacity = Number.isFinite(capacityParsed as number) ? (capacityParsed as number) : null;
+    const fee = body?.fee !== undefined ? parseFloat(body.fee) : 0;
 
     if (!title) {
       return NextResponse.json({ message: 'Title is required' }, { status: 400 });
@@ -261,11 +262,11 @@ export async function PUT(
       const setCapacitySql = capacityColumn ? `, ${capacityColumn} = ?` : '';
       const updateParams: any[] = [title, description, location, startTime, endTime];
       if (capacityColumn) updateParams.push(capacityValue);
-      updateParams.push(status, eventId);
+      updateParams.push(status, fee, eventId);
 
       const [updateResult] = await connection.query<ResultSetHeader>(
         `UPDATE events 
-         SET title = ?, description = ?, location = ?, start_time = ?, end_time = ?${setCapacitySql}, status = ?
+         SET title = ?, description = ?, location = ?, start_time = ?, end_time = ?${setCapacitySql}, status = ?, fee = ?
          WHERE id = ?`,
         updateParams
       );
@@ -281,11 +282,11 @@ export async function PUT(
       const setCapacitySql = capacityColumn ? `, ${capacityColumn} = ?` : '';
       const updateParams: any[] = [title, description, location, startDate, endDate];
       if (capacityColumn) updateParams.push(capacityValue);
-      updateParams.push(status, eventId);
+      updateParams.push(status, fee, eventId);
 
       const [updateResult] = await connection.query<ResultSetHeader>(
         `UPDATE events 
-         SET title = ?, description = ?, location = ?, start_date = ?, end_date = ?${setCapacitySql}, status = ?
+         SET title = ?, description = ?, location = ?, start_date = ?, end_date = ?${setCapacitySql}, status = ?, fee = ?
          WHERE id = ?`,
         updateParams
       );

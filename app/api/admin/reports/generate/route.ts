@@ -70,22 +70,16 @@ export async function POST(request: Request) {
 
     switch (reportType) {
       case 'users':
+        // Users report: name, email, registrationDate, membershipType, status
         query = `
           SELECT 
-            u.id,
             u.name,
             u.email,
-            u.is_approved,
-            u.created_at,
-            up.membership_number,
-            up.membership_type,
-            up.membership_status,
-            up.join_date,
-            m.expiry_date,
-            m.payment_status
+            u.created_at as registrationDate,
+            COALESCE(up.membership_type, 'Not Set') as membershipType,
+            COALESCE(up.membership_status, 'Inactive') as status
           FROM users u
           LEFT JOIN user_profiles up ON u.id = up.user_id
-          LEFT JOIN memberships m ON u.id = m.user_id
           WHERE u.created_at BETWEEN ? AND ?
           ORDER BY u.created_at DESC
         `;
@@ -93,82 +87,57 @@ export async function POST(request: Request) {
         break;
 
       case 'activity':
+        // Activity report: logins, pageViews, actions, duration, lastActive
         query = `
           SELECT 
-            'user_registration' as activity_type,
-            u.name COLLATE utf8mb4_unicode_ci as name,
-            u.email COLLATE utf8mb4_unicode_ci as email,
-            u.created_at as activity_date,
-            CONCAT('User registered: ', u.name) COLLATE utf8mb4_unicode_ci as description
-          FROM users u
-          WHERE u.created_at BETWEEN ? AND ?
-          
-          UNION ALL
-          
-          SELECT 
-            'event_created' as activity_type,
-            e.title COLLATE utf8mb4_unicode_ci as name,
-            '' COLLATE utf8mb4_unicode_ci as email,
-            e.created_at as activity_date,
-            CONCAT('Event created: ', e.title) COLLATE utf8mb4_unicode_ci as description
-          FROM events e
-          WHERE e.created_at BETWEEN ? AND ?
-          
-          UNION ALL
-          
-          SELECT 
-            'payment' as activity_type,
-            u.name COLLATE utf8mb4_unicode_ci as name,
-            u.email COLLATE utf8mb4_unicode_ci as email,
-            p.created_at as activity_date,
-            CONCAT('Payment: ', p.amount, ' via ', p.payment_method) COLLATE utf8mb4_unicode_ci as description
-          FROM payments p
-          LEFT JOIN users u ON p.user_id = u.id
-          WHERE p.created_at BETWEEN ? AND ?
-          
-          ORDER BY activity_date DESC
-        `;
-        params = [effectiveStartDate, effectiveEndDate, effectiveStartDate, effectiveEndDate, effectiveStartDate, effectiveEndDate];
-        break;
-
-      case 'membership':
-        query = `
-          SELECT 
-            u.id,
             u.name,
             u.email,
-            u.is_approved,
-            up.membership_number,
-            up.membership_type,
-            up.membership_status,
-            up.join_date,
-            m.expiry_date,
-            m.payment_status
+            COUNT(DISTINCT DATE(al.created_at)) as logins,
+            COUNT(al.id) as pageViews,
+            SUM(CASE WHEN al.action_type IS NOT NULL THEN 1 ELSE 0 END) as actions,
+            ROUND(AVG(CASE WHEN al.session_duration > 0 THEN al.session_duration ELSE 0 END), 2) as duration,
+            MAX(al.created_at) as lastActive
           FROM users u
-          LEFT JOIN user_profiles up ON u.id = up.user_id
-          LEFT JOIN memberships m ON u.id = m.user_id
-          WHERE u.created_at BETWEEN ? AND ?
-          ORDER BY u.created_at DESC
+          LEFT JOIN activity_logs al ON u.id = al.user_id AND al.created_at BETWEEN ? AND ?
+          GROUP BY u.id, u.name, u.email
+          ORDER BY lastActive DESC
         `;
         params = [effectiveStartDate, effectiveEndDate];
         break;
 
-      case 'payments':
-      case 'financial':
+      case 'membership':
+        // Membership report: type, status, joinDate, expiryDate, payments
         query = `
           SELECT 
-            p.id,
-            p.user_id,
-            u.name,
-            u.email,
-            p.transaction_id,
+            COALESCE(up.membership_type, 'Personal') as type,
+            COALESCE(up.membership_status, 'Inactive') as status,
+            up.join_date as joinDate,
+            m.expiry_date as expiryDate,
+            COUNT(p.id) as payments
+          FROM users u
+          LEFT JOIN user_profiles up ON u.id = up.user_id
+          LEFT JOIN memberships m ON u.id = m.user_id
+          LEFT JOIN payments p ON u.id = p.user_id AND p.created_at BETWEEN ? AND ?
+          WHERE u.created_at BETWEEN ? AND ?
+          GROUP BY u.id, up.membership_type, up.membership_status, up.join_date, m.expiry_date
+          ORDER BY up.join_date DESC
+        `;
+        params = [effectiveStartDate, effectiveEndDate, effectiveStartDate, effectiveEndDate];
+        break;
+
+      case 'payments':
+      case 'financial':
+        // Payments report: amount, status, paymentDate, membershipType, method
+        query = `
+          SELECT 
             p.amount,
-            COALESCE(p.payment_method, 'Unknown') as payment_method,
             p.status,
-            p.created_at as payment_date,
-            p.created_at
+            p.created_at as paymentDate,
+            COALESCE(up.membership_type, 'Personal') as membershipType,
+            COALESCE(p.payment_method, 'Unknown') as method
           FROM payments p
           LEFT JOIN users u ON p.user_id = u.id
+          LEFT JOIN user_profiles up ON u.id = up.user_id
           WHERE p.created_at BETWEEN ? AND ?
           ORDER BY p.created_at DESC
         `;
@@ -176,87 +145,19 @@ export async function POST(request: Request) {
         break;
 
       case 'events':
+        // Events report: title, date, attendees, status, location
         query = `
           SELECT 
-            e.id,
             e.title,
-            e.description,
-            e.location,
-            e.start_time,
-            e.end_time,
-            e.capacity,
+            e.start_time as date,
+            COALESCE(COUNT(er.id), 0) as attendees,
             e.status,
-            e.created_by,
-            e.created_at,
-            COUNT(er.id) as registration_count
+            e.location
           FROM events e
           LEFT JOIN event_registrations er ON e.id = er.event_id
           WHERE e.created_at BETWEEN ? AND ?
-          GROUP BY e.id
-          ORDER BY e.created_at DESC
-        `;
-        params = [effectiveStartDate, effectiveEndDate];
-        break;
-
-      case 'attendance':
-        query = `
-          SELECT 
-            a.id,
-            a.user_id,
-            u.name,
-            u.email,
-            a.event_id,
-            e.title as event_title,
-            a.check_in_time,
-            a.check_out_time,
-            a.status,
-            a.created_at
-          FROM attendance a
-          LEFT JOIN users u ON a.user_id = u.id
-          LEFT JOIN events e ON a.event_id = e.id
-          WHERE a.created_at BETWEEN ? AND ?
-          ORDER BY a.created_at DESC
-        `;
-        params = [effectiveStartDate, effectiveEndDate];
-        break;
-
-      case 'inventory':
-        query = `
-          SELECT 
-            i.id,
-            i.title,
-            i.author,
-            i.isbn,
-            i.category,
-            i.status,
-            i.quantity,
-            i.available_quantity,
-            i.location,
-            i.created_at
-          FROM inventory i
-          WHERE i.created_at BETWEEN ? AND ?
-          ORDER BY i.created_at DESC
-        `;
-        params = [effectiveStartDate, effectiveEndDate];
-        break;
-
-      case 'event':
-        query = `
-          SELECT 
-            e.id,
-            e.title,
-            e.description,
-            e.location,
-            e.start_date,
-            e.end_date,
-            e.status,
-            COUNT(a.id) as attendance_count,
-            e.created_at
-          FROM events e
-          LEFT JOIN attendance a ON e.id = a.event_id
-          WHERE e.created_at BETWEEN ? AND ?
-          GROUP BY e.id
-          ORDER BY e.created_at DESC
+          GROUP BY e.id, e.title, e.start_time, e.status, e.location
+          ORDER BY e.start_time DESC
         `;
         params = [effectiveStartDate, effectiveEndDate];
         break;

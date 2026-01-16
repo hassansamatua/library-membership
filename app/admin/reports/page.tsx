@@ -5,6 +5,19 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { Bar, Pie, Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+} from 'chart.js';
 import {
   FiSearch,
   FiDownload,
@@ -21,6 +34,8 @@ import {
   FiX,
   FiTrash2,
 } from 'react-icons/fi';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement);
 
 interface Report {
   id: string;
@@ -61,6 +76,18 @@ export default function AdminReportsPage() {
   });
   const [reportData, setReportData] = useState<any>(null);
   const [showDataModal, setShowDataModal] = useState(false);
+  
+  // Support for multiple charts
+  interface ChartConfig {
+    id: string;
+    field: string;
+    type: 'bar' | 'pie' | 'line';
+    title: string;
+  }
+  const [activeCharts, setActiveCharts] = useState<ChartConfig[]>([]);
+  const [chartField, setChartField] = useState<string>('');
+  const [chartType, setChartType] = useState<'bar' | 'pie' | 'line'>('bar');
+
 
   const reportTemplates: ReportTemplate[] = [
     {
@@ -162,6 +189,10 @@ export default function AdminReportsPage() {
       
       if (data.success && data.data) {
         setReportData(data.data);
+        const chartableFields = getChartableFields(data.data);
+        if (chartableFields.length > 0) {
+          setChartField(chartableFields[0]);
+        }
         setShowDataModal(true);
         toast.success(`Report generated successfully - ${data.recordCount || data.data.length} records found`);
       } else {
@@ -233,6 +264,184 @@ export default function AdminReportsPage() {
       case 'activity': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const generateChartData = (data: any[], field: string, type: 'bar' | 'pie' | 'line') => {
+    if (!data || data.length === 0) return null;
+
+    const colors = [
+      'rgb(75, 192, 192)',
+      'rgb(255, 99, 132)',
+      'rgb(54, 162, 235)',
+      'rgb(255, 206, 86)',
+      'rgb(153, 102, 255)',
+      'rgb(255, 159, 64)',
+      'rgb(199, 199, 199)',
+      'rgb(83, 102, 255)',
+      'rgb(255, 205, 86)',
+      'rgb(201, 203, 207)',
+    ];
+
+    // Check if field is numeric (for aggregation) or categorical
+    const fieldValues = data.map(row => row[field]);
+    const isNumericField = fieldValues.some(v => typeof v === 'number' && v > 100);
+    
+    let chartLabels: string[] = [];
+    let chartData: number[] = [];
+
+    if (isNumericField) {
+      // For numeric fields like amount, sum them up
+      const uniqueValues = [...new Set(fieldValues)].filter(v => v !== null && v !== undefined);
+      chartLabels = uniqueValues.map(v => String(v)).sort();
+      chartData = chartLabels.map(label => {
+        const values = data
+          .filter(row => String(row[field]) === label)
+          .map(row => parseFloat(String(row[field])) || 0);
+        return values.reduce((a, b) => a + b, 0);
+      });
+    } else {
+      // For categorical fields, count occurrences
+      const uniqueValues = [...new Set(fieldValues)].filter(v => v !== null && v !== undefined);
+      chartLabels = uniqueValues.map(v => String(v));
+      chartData = chartLabels.map(label => 
+        fieldValues.filter(v => String(v) === label).length
+      );
+      
+      // Sort by count (descending) for better visualization
+      const sorted = chartLabels
+        .map((label, idx) => ({ label, count: chartData[idx] }))
+        .sort((a, b) => b.count - a.count);
+      chartLabels = sorted.map(s => s.label);
+      chartData = sorted.map(s => s.count);
+    }
+
+    const baseColors = colors.slice(0, Math.max(chartLabels.length, colors.length));
+
+    if (type === 'pie') {
+      return {
+        labels: chartLabels,
+        datasets: [
+          {
+            label: field,
+            data: chartData,
+            backgroundColor: baseColors,
+            borderColor: baseColors.map(c => c.replace('rgb', 'rgba').replace(')', ', 1)')),
+            borderWidth: 2,
+          },
+        ],
+      };
+    }
+
+    if (type === 'bar') {
+      return {
+        labels: chartLabels,
+        datasets: [
+          {
+            label: `${field}`,
+            data: chartData,
+            backgroundColor: baseColors[0],
+            borderColor: baseColors[0].replace('rgb', 'rgba').replace(')', ', 1)'),
+            borderWidth: 1,
+          },
+        ],
+      };
+    }
+
+    // Line chart
+    return {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: `Trend: ${field}`,
+          data: chartData,
+          borderColor: baseColors[0],
+          backgroundColor: baseColors[0].replace('rgb', 'rgba').replace(')', ', 0.1)'),
+          borderWidth: 2,
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: baseColors[0],
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 6,
+          pointHoverRadius: 8,
+        },
+      ],
+    };
+  };
+
+  const getChartableFields = (data: any[]) => {
+    if (!data || data.length === 0) return [];
+    const firstRow = data[0];
+    return Object.keys(firstRow).filter(key => {
+      const value = firstRow[key];
+      // Include string and number fields, exclude IDs and very long text
+      return (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') &&
+             !key.toLowerCase().includes('id') &&
+             String(value).length < 100;
+    });
+  };
+
+  const getSuggestedCharts = (reportType: string | undefined) => {
+    // Return suggested chart configurations based on report type
+    const suggestions: Record<string, Array<{ field: string; type: 'bar' | 'pie' | 'line'; title: string }>> = {
+      payments: [
+        { field: 'status', type: 'pie', title: 'Paid vs Pending/Overdue' },
+        { field: 'method', type: 'bar', title: 'Payment Methods Trend' },
+        { field: 'membershipType', type: 'bar', title: 'Payments by Membership Type' },
+        { field: 'amount', type: 'line', title: 'Payment Amounts Trend' },
+      ],
+      events: [
+        { field: 'title', type: 'bar', title: 'Registration by Event' },
+        { field: 'status', type: 'pie', title: 'Event Status Distribution' },
+        { field: 'attendees', type: 'bar', title: 'Events by Attendance' },
+        { field: 'location', type: 'bar', title: 'Events by Location' },
+      ],
+      membership: [
+        { field: 'status', type: 'pie', title: 'Active vs Inactive Members' },
+        { field: 'type', type: 'pie', title: 'Membership Types Distribution' },
+        { field: 'payments', type: 'bar', title: 'Payment History by Member' },
+      ],
+      users: [
+        { field: 'membershipType', type: 'pie', title: 'Users by Membership Type' },
+        { field: 'status', type: 'pie', title: 'User Status Distribution' },
+        { field: 'registrationDate', type: 'line', title: 'Registration Trend Over Time' },
+      ],
+      activity: [
+        { field: 'logins', type: 'bar', title: 'User Logins' },
+        { field: 'pageViews', type: 'bar', title: 'Page Views Distribution' },
+        { field: 'actions', type: 'bar', title: 'User Actions' },
+        { field: 'duration', type: 'line', title: 'Session Duration Trend' },
+      ],
+    };
+    
+    return suggestions[reportType] || [];
+  };
+
+  const addChartToAnalysis = (field: string, type: 'bar' | 'pie' | 'line', title?: string) => {
+    const chartId = `chart-${Date.now()}-${Math.random()}`;
+    const newChart: ChartConfig = {
+      id: chartId,
+      field,
+      type,
+      title: title || `${field} Analysis`,
+    };
+    setActiveCharts([...activeCharts, newChart]);
+  };
+
+  const removeChartFromAnalysis = (chartId: string) => {
+    setActiveCharts(activeCharts.filter(chart => chart.id !== chartId));
+  };
+
+  const addSuggestedChart = (suggestion: { field: string; type: 'bar' | 'pie' | 'line'; title: string }) => {
+    // Check if chart already exists
+    const exists = activeCharts.some(chart => chart.field === suggestion.field && chart.type === suggestion.type);
+    if (!exists) {
+      addChartToAnalysis(suggestion.field, suggestion.type, suggestion.title);
+    }
+  };
+
+  const clearAllCharts = () => {
+    setActiveCharts([]);
   };
 
   const formatFileSize = (bytes: number) => {
@@ -628,7 +837,7 @@ export default function AdminReportsPage() {
       {/* Report Data Modal */}
       {showDataModal && reportData && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-gray-900">
@@ -649,45 +858,348 @@ export default function AdminReportsPage() {
               </p>
             </div>
             
-            <div className="overflow-auto max-h-[70vh]">
+            <div className="flex-1 overflow-auto flex flex-col">
+              {/* Suggested Charts Section */}
+              {reportData.length > 0 && selectedTemplate && getSuggestedCharts(selectedTemplate.type).length > 0 && (
+                <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
+                  <div className="mb-4 flex justify-between items-start">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        <FiTrendingUp className="inline mr-2 h-5 w-5 text-blue-600" />
+                        Suggested Visualizations
+                      </h3>
+                      <p className="text-sm text-gray-600">Click "Add to Dashboard" to compare multiple charts:</p>
+                    </div>
+                    {activeCharts.length > 0 && (
+                      <button
+                        onClick={clearAllCharts}
+                        className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                      >
+                        Clear All ({activeCharts.length})
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {getSuggestedCharts(selectedTemplate.type).map((suggestion, idx) => {
+                      const chartData = generateChartData(reportData, suggestion.field, suggestion.type);
+                      const isActive = activeCharts.some(c => c.field === suggestion.field && c.type === suggestion.type);
+                      return chartData ? (
+                        <div key={idx} className={`bg-white p-4 rounded-lg border-2 shadow-sm transition-all ${
+                          isActive ? 'border-green-500 shadow-md' : 'border-gray-200 hover:shadow-md'
+                        }`}>
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-900">{suggestion.title}</h4>
+                              <p className="text-xs text-gray-500">{suggestion.field}</p>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addSuggestedChart(suggestion);
+                              }}
+                              className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                                isActive
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                              }`}
+                            >
+                              {isActive ? '✓ Added' : 'Add'}
+                            </button>
+                          </div>
+                          <div 
+                            style={{ height: '150px', position: 'relative', cursor: 'pointer' }}
+                            onClick={() => {
+                              setChartField(suggestion.field);
+                              setChartType(suggestion.type);
+                            }}
+                          >
+                            {suggestion.type === 'bar' && (
+                              <Bar
+                                data={chartData}
+                                options={{
+                                  responsive: true,
+                                  maintainAspectRatio: false,
+                                  indexAxis: 'y' as const,
+                                  plugins: {
+                                    legend: { display: false },
+                                    title: { display: false },
+                                  },
+                                  scales: {
+                                    x: { display: false },
+                                    y: { display: false },
+                                  },
+                                }}
+                              />
+                            )}
+                            {suggestion.type === 'pie' && (
+                              <Pie
+                                data={chartData}
+                                options={{
+                                  responsive: true,
+                                  maintainAspectRatio: false,
+                                  plugins: {
+                                    legend: { display: true, position: 'bottom' as const, labels: { font: { size: 10 } } },
+                                    title: { display: false },
+                                  },
+                                }}
+                              />
+                            )}
+                            {suggestion.type === 'line' && (
+                              <Line
+                                data={chartData}
+                                options={{
+                                  responsive: true,
+                                  maintainAspectRatio: false,
+                                  plugins: {
+                                    legend: { display: false },
+                                    title: { display: false },
+                                  },
+                                  scales: {
+                                    x: { display: false },
+                                    y: { display: false },
+                                  },
+                                }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Multiple Active Charts Display */}
+              {activeCharts.length > 0 && reportData && (
+                <div className="p-6 border-b border-gray-200 bg-green-50">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      📊 Dashboard ({activeCharts.length} charts)
+                    </h3>
+                    <button
+                      onClick={clearAllCharts}
+                      className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                    >
+                      <FiX className="inline mr-1 h-4 w-4" />
+                      Clear All
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {activeCharts.map((chart) => {
+                      const chartData = generateChartData(reportData, chart.field, chart.type);
+                      return chartData ? (
+                        <div key={chart.id} className="bg-white p-4 rounded-lg border border-gray-300 shadow-sm">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-900">{chart.title}</h4>
+                              <p className="text-xs text-gray-500">{chart.field} ({chart.type})</p>
+                            </div>
+                            <button
+                              onClick={() => removeChartFromAnalysis(chart.id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Remove chart"
+                            >
+                              <FiX className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div style={{ height: '300px', position: 'relative' }}>
+                            {chart.type === 'bar' && (
+                              <Bar
+                                data={chartData}
+                                options={{
+                                  responsive: true,
+                                  maintainAspectRatio: false,
+                                  plugins: {
+                                    legend: { position: 'top' as const },
+                                    title: { display: false },
+                                  },
+                                }}
+                              />
+                            )}
+                            {chart.type === 'pie' && (
+                              <Pie
+                                data={chartData}
+                                options={{
+                                  responsive: true,
+                                  maintainAspectRatio: false,
+                                  plugins: {
+                                    legend: { position: 'right' as const },
+                                    title: { display: false },
+                                  },
+                                }}
+                              />
+                            )}
+                            {chart.type === 'line' && (
+                              <Line
+                                data={chartData}
+                                options={{
+                                  responsive: true,
+                                  maintainAspectRatio: false,
+                                  plugins: {
+                                    legend: { position: 'top' as const },
+                                    title: { display: false },
+                                  },
+                                }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Chart Section */}
+              {reportData.length > 0 && getChartableFields(reportData).length > 0 && (
+                <div className="p-6 border-b border-gray-200 bg-gray-50">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Custom Visualization</h3>
+                      <p className="text-sm text-gray-600 mb-4">Create custom charts by selecting any field:</p>
+                    </div>
+                    <div className="flex flex-wrap gap-4 items-end">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Field to Visualize
+                        </label>
+                        <select
+                          value={chartField}
+                          onChange={(e) => setChartField(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500 text-sm"
+                        >
+                          <option value="">Select a field...</option>
+                          {getChartableFields(reportData).map(field => (
+                            <option key={field} value={field}>
+                              {field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Chart Type
+                        </label>
+                        <div className="flex gap-2">
+                          {(['bar', 'pie', 'line'] as const).map(type => (
+                            <button
+                              key={type}
+                              onClick={() => setChartType(type)}
+                              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                                chartType === type
+                                  ? 'bg-green-600 text-white'
+                                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {type.charAt(0).toUpperCase() + type.slice(1)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {chartField && (
+                        <button
+                          onClick={() => addChartToAnalysis(chartField, chartType, `${chartField} ${chartType} Chart`)}
+                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
+                        >
+                          <FiBarChart2 className="inline mr-2 h-4 w-4" />
+                          Add to Dashboard
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Chart Display */}
+                    {chartField && (
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div style={{ maxWidth: '100%', height: '400px', position: 'relative' }}>
+                          {chartType === 'bar' && generateChartData(reportData, chartField, 'bar') && (
+                            <Bar
+                              data={generateChartData(reportData, chartField, 'bar')}
+                              options={{
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                  legend: { position: 'top' as const },
+                                  title: { display: true, text: `${chartField} Distribution`, font: { size: 14, weight: 'bold' } },
+                                },
+                              }}
+                            />
+                          )}
+                          {chartType === 'pie' && generateChartData(reportData, chartField, 'pie') && (
+                            <Pie
+                              data={generateChartData(reportData, chartField, 'pie')}
+                              options={{
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                  legend: { position: 'right' as const },
+                                  title: { display: true, text: `${chartField} Distribution`, font: { size: 14, weight: 'bold' } },
+                                },
+                              }}
+                            />
+                          )}
+                          {chartType === 'line' && generateChartData(reportData, chartField, 'line') && (
+                            <Line
+                              data={generateChartData(reportData, chartField, 'line')}
+                              options={{
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                  legend: { position: 'top' as const },
+                                  title: { display: true, text: `${chartField} Trend`, font: { size: 14, weight: 'bold' } },
+                                },
+                              }}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Table Section */}
               {reportData.length === 0 ? (
                 <div className="text-center py-12">
                   <FiFileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                   <p className="text-gray-600">No data found for the selected criteria</p>
                 </div>
               ) : (
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      {Object.keys(reportData[0] || {}).map((key) => (
-                        <th
-                          key={key}
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {reportData.map((row: any, index: number) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        {Object.values(row).map((value: any, cellIndex: number) => (
-                          <td key={cellIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {value === null ? 'N/A' : 
-                             typeof value === 'boolean' ? (value ? 'Yes' : 'No') :
-                             value instanceof Date ? value.toLocaleDateString() :
-                             String(value)}
-                          </td>
+                <div className="overflow-auto flex-1">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        {Object.keys(reportData[0] || {}).map((key) => (
+                          <th
+                            key={key}
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {reportData.map((row: any, index: number) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          {Object.values(row).map((value: any, cellIndex: number) => (
+                            <td key={cellIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {value === null ? 'N/A' : 
+                               typeof value === 'boolean' ? (value ? 'Yes' : 'No') :
+                               value instanceof Date ? value.toLocaleDateString() :
+                               String(value)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
             
-            <div className="p-6 border-t border-gray-200">
+            <div className="p-6 border-t border-gray-200 bg-gray-50">
               <div className="flex justify-between items-center">
                 <p className="text-sm text-gray-600">
                   Generated on {new Date().toLocaleString()}

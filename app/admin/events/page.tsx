@@ -28,9 +28,13 @@ interface Event {
   location: string;
   maxAttendees: number;
   currentAttendees: number;
+  fee: number;
+  isFree: boolean;
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
   createdAt: string;
   updatedAt: string;
+  // For backward compatibility
+  price?: number;
 }
 
 export default function AdminEventsPage() {
@@ -49,6 +53,8 @@ export default function AdminEventsPage() {
     time: '',
     location: '',
     maxAttendees: 50,
+    fee: 0,
+    isFree: true
   });
 
   useEffect(() => {
@@ -106,14 +112,28 @@ export default function AdminEventsPage() {
 
   const handleEdit = (event: Event) => {
     setSelectedEvent(event);
+    
+    // Parse the date and time from the event's start_time if available
+    let eventDate = '';
+    let eventTime = '';
+    
+    if (event.start_time) {
+      const startDate = new Date(event.start_time);
+      eventDate = startDate.toISOString().split('T')[0];
+      eventTime = startDate.toTimeString().slice(0, 5); // Gets HH:MM format
+    }
+    
     setFormData({
-      title: event.title,
-      description: event.description,
-      date: event.date,
-      time: event.time,
-      location: event.location,
-      maxAttendees: event.maxAttendees,
+      title: event.title || '',
+      description: event.description || '',
+      date: eventDate || event.date || '',
+      time: eventTime || event.time || '',
+      location: event.location || '',
+      maxAttendees: event.maxAttendees || 50,
+      fee: event.fee || 0,
+      isFree: event.isFree || false
     });
+    
     setIsEditing(true);
     setShowEventModal(true);
   };
@@ -160,6 +180,8 @@ export default function AdminEventsPage() {
       time: '',
       location: '',
       maxAttendees: 50,
+      fee: 0,
+      isFree: true
     });
     setSelectedEvent(null);
     setIsEditing(false);
@@ -291,9 +313,19 @@ export default function AdminEventsPage() {
                     <FiMapPin className="mr-2 h-4 w-4" />
                     {event.location}
                   </div>
+                  <div className="flex flex-col">
+                    <div className="flex items-center">
+                      <FiUsers className="mr-2 h-4 w-4" />
+                      <span className="font-medium">Registrations</span>
+                    </div>
+                    <div className="ml-6 text-gray-600">
+                      {event.currentAttendees} Total registered
+                      {event.maxAttendees > 0 && ` (max ${event.maxAttendees})`}
+                    </div>
+                  </div>
                   <div className="flex items-center">
-                    <FiUsers className="mr-2 h-4 w-4" />
-                    {event.currentAttendees}/{event.maxAttendees} attendees
+                    <FiClock className="mr-2 h-4 w-4" />
+                    {event.isFree ? 'Free' : `TZS ${(event.fee || 0).toLocaleString()}`}
                   </div>
                 </div>
                 
@@ -441,7 +473,49 @@ export default function AdminEventsPage() {
                   />
                 </div>
 
-                <div className="flex justify-end space-x-3 pt-4 border-t">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Event Fee
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        className="form-radio h-4 w-4 text-green-600"
+                        checked={formData.isFree}
+                        />
+                        onChange={() => setFormData({ ...formData, isFree: true, price: 0 })}
+                      <span className="ml-2 text-gray-700">Free</span>
+                    </label>
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        className="form-radio h-4 w-4 text-green-600"
+                        checked={!formData.isFree}
+                        onChange={() => setFormData({ ...formData, isFree: false })}
+                      />
+                      <span className="ml-2 text-gray-700">Paid</span>
+                    </label>
+                    {!formData.isFree && (
+                      <div className="relative rounded-md shadow-sm">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <span className="text-gray-500 sm:text-sm">TZS</span>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1000"
+                          className="focus:ring-green-500 focus:border-green-500 block w-full pl-12 pr-12 sm:text-sm border-gray-300 rounded-md py-2 border"
+                          value={formData.fee}
+                          onChange={(e) => setFormData({ ...formData, fee: parseFloat(e.target.value) || 0 })}
+                          placeholder="0.00"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="mt-6 flex justify-end space-x-3">
                   <button
                     type="button"
                     onClick={() => {

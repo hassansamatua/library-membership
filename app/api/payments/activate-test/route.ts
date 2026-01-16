@@ -73,22 +73,42 @@ export async function POST(request: Request) {
       
       const payment = paymentRows[0];
       
-      // 2. Update payment status to completed
-      await connection.execute(
-        `UPDATE payments 
-         SET status = 'completed', 
-             paid_at = NOW(),
-             updated_at = NOW()
-         WHERE id = ? AND user_id = ?`,
-        [payment.id, userId]
-      );
-      
-      // 3. Generate membership number
+      // 2. Generate membership number and get current year
       const year = new Date().getFullYear().toString().slice(-2);
       const membershipNumber = `TLA${year}${Math.floor(10000 + Math.random() * 90000)}`;
       const currentYear = new Date().getFullYear();
       
-      // 4. Create or update membership with all required fields
+      // 3. First, create/update the membership_payments record
+      await connection.execute(
+        `INSERT INTO membership_payments 
+         (user_id, amount, payment_method, reference, 
+          payment_date, status, cycle_year, created_at, updated_at)
+         VALUES (?, ?, ?, ?, NOW(), 'completed', ?, NOW(), NOW())
+         ON DUPLICATE KEY UPDATE
+           status = 'completed',
+           payment_date = NOW(),
+           updated_at = NOW()`,
+        [
+          userId,
+          payment.amount || 40000,
+          payment.payment_method || 'test',
+          payment.reference,
+          currentYear
+        ]
+      );
+      
+      // 4. Then, update the payments table to match the membership_payments status
+      await connection.execute(
+        `UPDATE payments p
+         INNER JOIN membership_payments mp ON p.reference = mp.reference
+         SET p.status = mp.status,
+             p.paid_at = mp.payment_date,
+             p.updated_at = NOW()
+         WHERE p.id = ? AND p.user_id = ?`,
+        [payment.id, userId]
+      );
+      
+      // 5. Finally, create or update the membership record
       await connection.execute(
         `INSERT INTO memberships 
          (user_id, membership_number, membership_type, status, 
@@ -113,24 +133,6 @@ export async function POST(request: Request) {
           payment.reference,
           payment.payment_method || 'test',
           payment.amount || 40000
-        ]
-      );
-      
-      // 5. Create payment record in membership_payments
-      await connection.execute(
-        `INSERT INTO membership_payments 
-         (user_id, amount, payment_method, reference, 
-          payment_date, status, cycle_year)
-         VALUES (?, ?, ?, ?, NOW(), 'completed', ?)
-         ON DUPLICATE KEY UPDATE
-           status = 'completed',
-           updated_at = NOW()`,
-        [
-          userId,
-          payment.amount || 40000,
-          payment.payment_method || 'test',
-          payment.reference,
-          currentYear
         ]
       );
       

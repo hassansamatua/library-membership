@@ -20,6 +20,8 @@ interface Event {
   created_by: number;
   created_at: string;
   updated_at: string;
+  is_free: boolean;
+  price: number;
 }
 
 export default function EventsPage() {
@@ -195,16 +197,21 @@ export default function EventsPage() {
                       <FiMapPin className="h-4 w-4 mr-2 text-gray-400" />
                       {event.location}
                     </div>
-                    <div className="flex items-center">
-                      <FiUsers className="h-4 w-4 mr-2 text-gray-400" />
-                      {event.current_attendees} / {event.capacity} attendees
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <FiUsers className="h-4 w-4 mr-2 text-gray-400" />
+                        {event.current_attendees} / {event.capacity} attendees
+                      </div>
+                      <div className="ml-4 px-2 py-1 bg-gray-100 rounded-md text-sm font-medium text-gray-700">
+                        {event.is_free ? 'Free' : `TZS ${event.price?.toLocaleString() || '0'}`}
+                      </div>
                     </div>
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-lg font-bold text-gray-900">
-                        Free Event
+                        {event.is_free ? 'Free Event' : `TZS ${event.price?.toLocaleString() || '0'}`}
                       </span>
                       <div className="flex space-x-2">
                         <button
@@ -322,8 +329,10 @@ export default function EventsPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-1">Type</h4>
-                      <p className="text-gray-600">Free Event</p>
+                      <h4 className="font-semibold text-gray-900 mb-1">Fee</h4>
+                      <p className="text-gray-600">
+                        {selectedEvent.is_free ? 'Free' : `TZS ${selectedEvent.price?.toLocaleString() || '0'}`}
+                      </p>
                     </div>
                     <div>
                       <h4 className="font-semibold text-gray-900 mb-1">Availability</h4>

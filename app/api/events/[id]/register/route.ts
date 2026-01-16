@@ -43,13 +43,33 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ error: 'Event is fully booked' }, { status: 400 });
       }
 
-      // Register for event
-      await connection.query(
-        'INSERT INTO event_registrations (event_id, user_id, registered_at) VALUES (?, ?, NOW())',
-        [eventId, userId]
-      );
+      // Start a transaction
+      await connection.beginTransaction();
 
-      return NextResponse.json({ success: true });
+      try {
+        // Register for event
+        await connection.query(
+          'INSERT INTO event_registrations (event_id, user_id, registered_at) VALUES (?, ?, NOW())',
+          [eventId, userId]
+        );
+
+        // Get updated attendee count
+        const [result] = await connection.query<RowDataPacket[]>(
+          'SELECT COUNT(*) as attendeeCount FROM event_registrations WHERE event_id = ?',
+          [eventId]
+        );
+        const attendeeCount = result[0]?.attendeeCount || 0;
+
+        await connection.commit();
+        
+        return NextResponse.json({ 
+          success: true, 
+          attendeeCount: attendeeCount || 0 
+        });
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      }
     } finally {
       connection.release();
     }

@@ -60,27 +60,63 @@ export default function PaymentPage() {
       return;
     }
 
-    // Calculate pricing and status
+    // Check if user is new or continuing
     const calculatePricing = async () => {
       try {
-        // Check if user is new or continuing
-        const response = await fetch('/api/membership/status', { credentials: 'include' });
+        // Fetch membership status and payment history
+        const response = await fetch('/api/membership/status', { 
+          credentials: 'include',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
         const data = await response.json();
         
-        // Better logic to determine if user is new
-        let isNewUser = true;
-        if (data.membership && data.membership.paymentStatus === 'paid') {
-          // User has a paid membership, check if it's for current year
-          const paymentYear = new Date(data.membership.payment_date).getFullYear();
-          const currentYear = new Date().getFullYear();
-          const membershipYear = currentYear - (new Date().getMonth() < 2 ? 1 : 0); // Membership year runs Feb-Jan
-          isNewUser = paymentYear !== membershipYear;
+        console.log('Membership status data:', data);
+        
+        // Check if user has any completed payments in any cycle year
+        let hasAnyPayment = false;
+        
+        // Check if we have any payments in the response
+        if (data.payments && data.payments.length > 0) {
+          // Check for any completed payment regardless of the year
+          hasAnyPayment = data.payments.some((p: any) => p.status === 'completed');
+          console.log('Has any payment:', hasAnyPayment, data.payments);
         }
+        
+        // Check membership record for any payment
+        let hasMembershipPayment = false;
+        if (data.membership && data.membership.payment_status === 'paid' && data.membership.payment_date) {
+          hasMembershipPayment = true;
+          console.log('Has membership payment:', data.membership);
+        }
+        
+        // User is new if they have no payments at all and no membership payment record
+        const isNewUser = !hasAnyPayment && !hasMembershipPayment;
+        
+        // Force new user status if this is their first payment
+        // This ensures new users always pay 40,000 TZS for their first payment
+        if (isNewUser && !data.membership) {
+          console.log('First time user - applying new user pricing');
+        }
+        console.log('Is new user:', isNewUser, { hasAnyPayment, hasMembershipPayment });
         
         console.log('User status:', { isNewUser, membership: data.membership });
         
-        // Calculate pricing
-        const pricingData = calculateMembershipPricing(membershipType, isNewUser);
+        // Calculate pricing - force isNewUser to true if no membership exists
+        const effectiveIsNewUser = !data.membership || isNewUser;
+        console.log('Pricing calculation:', { 
+          membershipType, 
+          isNewUser, 
+          effectiveIsNewUser,
+          hasMembership: !!data.membership,
+          hasAnyPayment
+        });
+        
+        const pricingData = calculateMembershipPricing(membershipType, effectiveIsNewUser);
+        console.log('Pricing data:', pricingData);
         setPricing(pricingData);
 
         // Get membership status

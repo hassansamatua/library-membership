@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUnreadCount } from '@/contexts/UnreadCountContext';
 import { 
   FiBell, 
   FiCalendar,
@@ -31,7 +32,7 @@ export default function NewsPage() {
   const router = useRouter();
   const [news, setNews] = useState<News[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { unreadCount, setUnreadCount, refreshUnreadCount } = useUnreadCount();
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -52,12 +53,15 @@ export default function NewsPage() {
   const fetchNews = async (page = 1) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/news?page=${page}&limit=${pagination.limit}`);
+      const response = await fetch(`/api/news?page=${page}&limit=${pagination.limit}`, {
+        cache: 'no-store'
+      });
       if (response.ok) {
         const data = await response.json();
         setNews(data.news || []);
         setPagination(data.pagination);
-        setUnreadCount(data.unreadCount || 0);
+        // The unread count is now managed by the context
+        await refreshUnreadCount();
       }
     } catch (error) {
       console.error('Error fetching news:', error);
@@ -77,10 +81,13 @@ export default function NewsPage() {
       });
 
       if (response.ok) {
+        // Update local state
         setNews(prev => prev.map(item => 
           item.id === newsId ? { ...item, is_read: true } : item
         ));
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        
+        // Update the global unread count
+        await refreshUnreadCount();
       }
     } catch (error) {
       console.error('Error marking as read:', error);

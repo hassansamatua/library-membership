@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { AuthProvider } from '@/contexts/AuthContext';
+import { UnreadCountProvider } from '@/contexts/UnreadCountContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ConditionalLayout from '../components/ConditionalLayout';
@@ -38,16 +39,18 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <ConditionalLayout>
-              {children}
-            </ConditionalLayout>
-            <ToastContainer 
-              position="bottom-right"
-              theme="colored"
-              className="[&>div]:bg-background! [&>div]:text-foreground! [&>div]:border! [&>div]:border-border!"
-              toastClassName="bg-background! text-foreground! border! border-border!"
-              progressClassName="bg-primary!"
-            />
+            <UnreadCountProvider>
+              <ConditionalLayout>
+                {children}
+              </ConditionalLayout>
+              <ToastContainer 
+                position="bottom-right"
+                theme="colored"
+                className="[&>div]:bg-background! [&>div]:text-foreground! [&>div]:border! [&>div]:border-border!"
+                toastClassName="bg-background! text-foreground! border! border-border!"
+                progressClassName="bg-primary!"
+              />
+            </UnreadCountProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

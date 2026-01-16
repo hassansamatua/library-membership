@@ -10,6 +10,7 @@ import { Footer } from "@/components/web/footer";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { useEffect, useState } from "react";
 import { canAccessDashboard } from "@/lib/profileCompletion";
+import { UnreadCountProvider, useUnreadCount } from "@/contexts/UnreadCountContext";
 import {
   FiHome,
   FiUser,
@@ -57,8 +58,9 @@ const calculateProfileCompletion = (user: any) => {
     if (employment.company) { completedFields++; console.log(' Company'); }
     if (employment.yearsOfExperience) { completedFields++; console.log(' Years of Experience'); }
     if (employment.skills && employment.skills.length > 0) { completedFields++; console.log(' Skills'); }
-  } catch (e) {
-    console.log(' Failed to parse employment: ' + e.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log(' Failed to parse employment: ' + errorMessage);
   }
 
   // Education fields (3)
@@ -67,8 +69,9 @@ const calculateProfileCompletion = (user: any) => {
     if (education.length > 0 && education[0].highestDegree) { completedFields++; console.log(' Highest Degree'); }
     if (education.length > 0 && education[0].institution) { completedFields++; console.log(' Institution'); }
     if (education.length > 0 && education[0].yearOfGraduation) { completedFields++; console.log(' Year of Graduation'); }
-  } catch (e) {
-    console.log(' Failed to parse education: ' + e.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log(' Failed to parse education: ' + errorMessage);
   }
 
   // Documents fields (3)
@@ -98,7 +101,7 @@ export default function DashboardLayout({
   const [mounted, setMounted] = useState(false);
   const [membershipStatus, setMembershipStatus] = useState<any>(null);
   const [profileCompletion, setProfileCompletion] = useState(0);
-  const [unreadNewsCount, setUnreadNewsCount] = useState(0);
+  const { unreadCount: unreadNewsCount, refreshUnreadCount } = useUnreadCount();
 
   // Handle hydration
   useEffect(() => {
@@ -121,42 +124,26 @@ export default function DashboardLayout({
         // Calculate profile completion
         const completion = calculateProfileCompletion(user);
         setProfileCompletion(completion);
-
-        // Fetch unread news count
-        const newsRes = await fetch('/api/news?limit=1', { credentials: 'include' });
-        if (newsRes.ok) {
-          const newsData = await newsRes.json();
-          setUnreadNewsCount(newsData.unreadCount || 0);
-        }
+        
+        // Refresh unread count
+        await refreshUnreadCount();
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       }
     };
 
     loadData();
-  }, [mounted, authLoading, user]);
+  }, [mounted, authLoading, user, refreshUnreadCount]);
 
   // Refresh unread count when pathname changes (user returns from news page)
   useEffect(() => {
     if (!mounted || !user) return;
     
-    const refreshUnreadCount = async () => {
-      try {
-        const newsRes = await fetch('/api/news?limit=1', { credentials: 'include' });
-        if (newsRes.ok) {
-          const newsData = await newsRes.json();
-          setUnreadNewsCount(newsData.unreadCount || 0);
-        }
-      } catch (error) {
-        console.error('Error refreshing unread count:', error);
-      }
-    };
-
     // Refresh when user navigates back to dashboard
     if (pathname === '/dashboard') {
       refreshUnreadCount();
     }
-  }, [mounted, user, pathname]);
+  }, [mounted, user, pathname, refreshUnreadCount]);
 
   const menuItems = [
     { name: 'Dashboard', href: '/dashboard', icon: FiHome },

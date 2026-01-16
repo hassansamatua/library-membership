@@ -23,10 +23,13 @@ export default function PaymentSuccessPage() {
       // If test mode, immediately show success and activate membership
       if (testMode === 'true' || referenceParam.startsWith('TEST-')) {
         setStatus('success');
-        setMessage('Test payment successful! Your membership has been activated.');
+        setMessage('Payment successful! Your membership has been activated.');
         
         // For test payments, activate membership via server action
-        activateTestMembership(referenceParam, referenceParam);
+        activateTestMembership(referenceParam);
+        
+        // Ensure the payment status is marked as completed
+        // The API will handle updating the membership status
       } else {
         // Real payment - check status
         checkPaymentStatus(referenceParam);

@@ -140,85 +140,143 @@ export default function MembershipCardPage() {
     let logoError = false;
     let profileError = false;
 
-    // Create clipping path for circular logo
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(72, 56, 40, 0, Math.PI * 2);
-    ctx.clip();
-
-    // Draw actual logo image if available
+    // Simplified logo loading - draw background first
     console.log('🖼️ Starting logo load...');
-    const logoImg = new Image();
-    // Set crossOrigin to handle potential CORS issues
-    logoImg.crossOrigin = 'anonymous';
-    logoImg.onload = () => {
-      console.log('✅ Logo loaded successfully');
-      ctx.drawImage(logoImg, 32, 16, 80, 80);
-      ctx.restore();
-      logoLoaded = true;
-      loadProfileImage();
-    };
-    logoImg.onerror = () => {
-      console.warn('⚠️ Logo image failed to load, using fallback');
-      // Fallback to text logo with circular background
+    
+    // Debug canvas dimensions and positioning
+    console.log('🎨 Canvas dimensions:', canvas.width, 'x', canvas.height);
+    console.log('📍 Logo position: 72, 42');
+    console.log('📍 Profile position:', canvas.width - 128, 42);
+    
+    // Draw logo with fallback text if image fails
+    if (ctx) {
+      // White square background with rounded corners
       ctx.fillStyle = 'white';
+      const logoSize = 56;
+      const logoX = 72;
+      const logoY = 47; // Moved down to match profile image position (52 - 5)
+      const radius = 8;
+      
+      console.log('🔲 Drawing logo background at:', logoX, logoY, 'size:', logoSize);
+      
+      // Draw rounded rectangle
       ctx.beginPath();
-      ctx.arc(72, 56, 40, 0, Math.PI * 2);
+      ctx.moveTo(logoX + radius, logoY);
+      ctx.lineTo(logoX + logoSize - radius, logoY);
+      ctx.quadraticCurveTo(logoX + logoSize, logoY, logoX + logoSize, logoY + radius);
+      ctx.lineTo(logoX + logoSize, logoY + logoSize - radius);
+      ctx.quadraticCurveTo(logoX + logoSize, logoY + logoSize, logoX + logoSize - radius, logoY + logoSize);
+      ctx.lineTo(logoX + radius, logoY + logoSize);
+      ctx.quadraticCurveTo(logoX, logoY + logoSize, logoX, logoY + logoSize - radius);
+      ctx.lineTo(logoX, logoY + radius);
+      ctx.quadraticCurveTo(logoX, logoY, logoX + radius, logoY);
+      ctx.closePath();
       ctx.fill();
       
-      ctx.fillStyle = '#059669';
-      ctx.font = 'bold 32px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('TLA', 72, 56);
-      ctx.restore();
-      logoError = true;
-      loadProfileImage();
-    };
-    
-    // Add timeout to handle slow loading
-    setTimeout(() => {
-      if (!logoLoaded && !logoError) {
-        console.warn('Logo image loading timeout, using fallback');
-        // Manually trigger the error handler
-        ctx.fillStyle = 'white';
-        ctx.beginPath();
-        ctx.arc(72, 56, 40, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = '#059669';
-        ctx.font = 'bold 32px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('TLA', 72, 56);
-        ctx.restore();
+      // Load and draw logo image with fallback
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      let logoDrawn = false;
+      
+      logoImg.onload = () => {
+        console.log('✅ Logo loaded successfully, dimensions:', logoImg.naturalWidth, 'x', logoImg.naturalHeight);
+        if (ctx && !logoDrawn) {
+          console.log('🖼️ Drawing logo at:', logoX, logoY, 'size:', logoSize);
+          
+          // Create clipping path to match the frame
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(logoX, logoY, logoSize, logoSize, 8);
+          ctx.clip();
+          
+          // Draw larger logo to fill frame completely
+          const largerSize = 60; // Reduced from 70 for more zoom out
+          const largerX = logoX - (largerSize - logoSize) / 2;
+          const largerY = logoY - (largerSize - logoSize) / 2;
+          ctx.drawImage(logoImg, largerX, largerY, largerSize, largerSize);
+          ctx.restore();
+          
+          logoDrawn = true;
+        }
+        logoLoaded = true;
+        loadProfileImage();
+      };
+      
+      logoImg.onerror = (error) => {
+        console.error('❌ Logo failed to load:', error);
+        console.error('🔍 Logo src was:', logoImg.src);
+        // Draw TLA text as fallback
+        if (ctx && !logoDrawn) {
+          console.log('📝 Using text fallback');
+          ctx.fillStyle = '#059669';
+          ctx.font = 'bold 24px Arial Black, Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('TLA', logoX + logoSize/2, logoY + logoSize/2 - 8);
+          
+          ctx.font = 'bold 10px Arial, sans-serif';
+          ctx.fillText('LIBRARY', logoX + logoSize/2, logoY + logoSize/2 + 8);
+          logoDrawn = true;
+        }
         logoError = true;
         loadProfileImage();
-      }
-    }, 3000);
-    
-    logoImg.src = '/logo.png';
+      };
+      
+      // Timeout fallback
+      setTimeout(() => {
+        if (!logoDrawn && ctx) {
+          console.warn('⏰ Logo timeout, using text fallback');
+          ctx.fillStyle = '#059669';
+          ctx.font = 'bold 24px Arial Black, Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('TLA', logoX + logoSize/2, logoY + logoSize/2 - 8);
+          
+          ctx.font = 'bold 10px Arial, sans-serif';
+          ctx.fillText('LIBRARY', logoX + logoSize/2, logoY + logoSize/2 + 8);
+          logoDrawn = true;
+          logoError = true;
+          loadProfileImage();
+        }
+      }, 2000);
+      
+      logoImg.src = '/logo.png'; // Use the correct path that works
+    }
 
     function loadProfileImage() {
       console.log('👤 Starting profile image load...');
-      // Draw profile picture background - exact white
+      if (!ctx) return;
+      
+      // Draw profile picture background - square frame
       ctx.fillStyle = 'white';
       ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
       ctx.shadowBlur = 10;
       ctx.shadowOffsetX = 2;
       ctx.shadowOffsetY = 2;
+      
+      const profileSize = 56;
+      const profileX = canvas.width - 128; // Position from right edge
+      const profileY = 42;
+      const radius = 8;
+      
+      console.log('🔲 Drawing profile background at:', profileX, profileY, 'size:', profileSize);
+      
+      // Draw rounded rectangle for profile
       ctx.beginPath();
-      ctx.arc(canvas.width - 80, 80, 40, 0, Math.PI * 2);
+      ctx.moveTo(profileX + radius, profileY);
+      ctx.lineTo(profileX + profileSize - radius, profileY);
+      ctx.quadraticCurveTo(profileX + profileSize, profileY, profileX + profileSize, profileY + radius);
+      ctx.lineTo(profileX + profileSize, profileY + profileSize - radius);
+      ctx.quadraticCurveTo(profileX + profileSize, profileY + profileSize, profileX + profileSize - radius, profileY + profileSize);
+      ctx.lineTo(profileX + radius, profileY + profileSize);
+      ctx.quadraticCurveTo(profileX, profileY + profileSize, profileX, profileY + profileSize - radius);
+      ctx.lineTo(profileX, profileY + radius);
+      ctx.quadraticCurveTo(profileX, profileY, profileX + radius, profileY);
+      ctx.closePath();
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 0;
-
-      // Create clipping path for circular profile picture
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(canvas.width - 80, 80, 40, 0, Math.PI * 2);
-      ctx.clip();
 
       // Draw profile picture image if available
       if (user?.profile?.personalInfo?.profilePicture) {
@@ -228,20 +286,46 @@ export default function MembershipCardPage() {
         profileImg.crossOrigin = 'anonymous';
         profileImg.onload = () => {
           console.log('✅ Profile image loaded successfully');
-          ctx.drawImage(profileImg, canvas.width - 120, 40, 80, 80);
-          ctx.restore();
+          if (ctx) {
+            // Draw profile image zoomed out and moved down more
+            const imageSize = 70; // Smaller size for zoom out effect
+            const imageWidth = 70; // Make it square for consistent scaling
+            const imageX = canvas.width - 128 - (imageWidth - 56) / 2; // Center in 56px frame
+            const imageY = 52 - (imageSize - 56) / 2; // Moved down 5 more pixels from 47 to 52
+            
+            // Create clipping path to match the frame
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(canvas.width - 128, 42, 56, 56, 8);
+            ctx.clip();
+            
+            ctx.drawImage(profileImg, imageX, imageY, imageWidth, imageSize);
+            ctx.restore();
+            ctx.restore();
+          }
           profileLoaded = true;
           checkAllImagesLoaded();
         };
         profileImg.onerror = () => {
           console.warn('⚠️ Profile image failed to load, using fallback');
           // Fallback to initial if image fails to load
-          ctx.fillStyle = '#4ade80'; // green-400 (exact match)
-          ctx.font = 'bold 40px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(user?.name?.charAt(0)?.toUpperCase() || 'M', canvas.width - 80, 80);
-          ctx.restore();
+          if (ctx) {
+            // Draw fallback in square frame
+            const fallbackX = canvas.width - 128;
+            const fallbackY = 42;
+            const fallbackSize = 56;
+            
+            // Green background
+            ctx.fillStyle = '#4ade80';
+            ctx.fillRect(fallbackX, fallbackY, fallbackSize, fallbackSize);
+            
+            // Initial text
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 32px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(user?.name?.charAt(0)?.toUpperCase() || 'M', fallbackX + fallbackSize/2, fallbackY + fallbackSize/2);
+          }
           profileError = true;
           checkAllImagesLoaded();
         };
@@ -250,27 +334,51 @@ export default function MembershipCardPage() {
         setTimeout(() => {
           if (!profileLoaded && !profileError) {
             console.warn('Profile image loading timeout, using fallback');
-            ctx.fillStyle = '#4ade80';
-            ctx.font = 'bold 40px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(user?.name?.charAt(0)?.toUpperCase() || 'M', canvas.width - 80, 80);
-            ctx.restore();
+            if (ctx) {
+              // Draw timeout fallback in square frame
+              const fallbackX = canvas.width - 128;
+              const fallbackY = 42;
+              const fallbackSize = 56;
+              
+              // Green background
+              ctx.fillStyle = '#4ade80';
+              ctx.fillRect(fallbackX, fallbackY, fallbackSize, fallbackSize);
+              
+              // Initial text
+              ctx.fillStyle = 'white';
+              ctx.font = 'bold 32px Arial';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(user?.name?.charAt(0)?.toUpperCase() || 'M', fallbackX + fallbackSize/2, fallbackY + fallbackSize/2);
+            }
             profileError = true;
             checkAllImagesLoaded();
           }
         }, 3000);
         
-        profileImg.src = user.profile.personalInfo.profilePicture;
+        profileImg.src = user.profile.personalInfo.profilePicture.startsWith('/uploads/') 
+          ? user.profile.personalInfo.profilePicture 
+          : `/uploads/profile-pictures/${user.profile.personalInfo.profilePicture.split('/').pop()}`;
       } else {
         console.log('📝 No profile picture, using initial');
         // Draw profile picture or initial - exact colors
-        ctx.fillStyle = '#4ade80'; // green-400 (exact match)
-        ctx.font = 'bold 40px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(user?.name?.charAt(0)?.toUpperCase() || 'M', canvas.width - 80, 80);
-        ctx.restore();
+        if (ctx) {
+          // Draw no-profile fallback in square frame
+          const fallbackX = canvas.width - 128;
+          const fallbackY = 42;
+          const fallbackSize = 56;
+          
+          // Green background
+          ctx.fillStyle = '#4ade80';
+          ctx.fillRect(fallbackX, fallbackY, fallbackSize, fallbackSize);
+          
+          // Initial text
+          ctx.fillStyle = 'white';
+          ctx.font = 'bold 32px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(user?.name?.charAt(0)?.toUpperCase() || 'M', fallbackX + fallbackSize/2, fallbackY + fallbackSize/2);
+        }
         checkAllImagesLoaded();
       }
     }
@@ -520,17 +628,11 @@ export default function MembershipCardPage() {
             
             <!-- Bottom section with details -->
             <g>
-              <!-- Expiry date -->
-              <text x="70" y="162" font-family="Arial, sans-serif" font-size="7" fill="#10b981" font-weight="700">VALID THRU</text>
-              <text x="70" y="174" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="white">12/26</text>
               
               <!-- Membership type -->
               <text x="150" y="162" font-family="Arial, sans-serif" font-size="7" fill="#10b981" font-weight="700">TYPE</text>
               <text x="150" y="174" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="white">${membershipStatus?.membership?.membershipType?.toUpperCase() || 'PERSONAL'}</text>
               
-              <!-- Status badge with green -->
-              <rect x="240" y="155" width="80" height="28" fill="rgba(16, 185, 129, 0.2)" stroke="#10b981" stroke-width="1.5" rx="4" ry="4"/>
-              <text x="280" y="175" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#10b981" text-anchor="middle">✓ ACTIVE</text>
             </g>
             
             <!-- Bottom accent bar with green -->
@@ -849,43 +951,84 @@ export default function MembershipCardPage() {
                   {/* Top header bar with green */}
                   <rect width="336" height="50" fill="rgba(16, 185, 129, 0.2)" rx="16" ry="16"/>
                   
-                  {/* Logo background - circular with white */}
-                  <circle cx="36" cy="28" r="20" fill="white" stroke="rgba(16, 185, 129, 0.3)" strokeWidth="2"/>
-                  <text x="36" y="28" fontFamily="Arial, sans-serif" fontSize="20" fontWeight="bold" fill="#059669" textAnchor="middle" dominantBaseline="middle">TLA</text>
+                  {/* Square logo frame without border */}
+                  <rect x="22" y="12" width="56" height="56" fill="white" rx="8" ry="8"/>
+                  {/* Actual Logo Image with clipping */}
+                  <defs>
+                    <clipPath id="logoClip">
+                      <rect x="22" y="12" width="56" height="56" rx="8" ry="8"/>
+                    </clipPath>
+                  </defs>
+                  <image
+                    href="/logo.png"
+                    x="20"
+                    y="8.5"
+                    width="60"
+                    height="60"
+                    clipPath="url(#logoClip)"
+                    preserveAspectRatio="xMidYMid meet"
+                  />
                   
                   {/* Organization name */}
-                  <text x="168" y="32" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">Tanzania Library and</text>
-                  <text x="168" y="48" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">Information Association</text>
-                  <text x="168" y="62" fontFamily="Arial" fontSize="10" fill="#10b981" textAnchor="middle" fontWeight="600">(TLA)</text>
+                  <text x="168" y="42" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">Tanzania Library and</text>
+                  <text x="168" y="58" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">Information Association</text>
+                  <text x="168" y="72" fontFamily="Arial" fontSize="10" fill="#10b981" textAnchor="middle" fontWeight="600">(TLA)</text>
                   
-                  {/* Profile picture with proper fallback */}
+                  {/* Profile picture with square frame and clipping */}
                   <g>
-                    {/* Profile background circle */}
-                    <circle cx="296" cy="32" r="20" fill="rgba(16, 185, 129, 0.1)" stroke="rgba(16, 185, 129, 0.4)" strokeWidth="2"/>
-                    <circle cx="296" cy="32" r="19" fill="url(#greenAccent)" stroke="white" strokeWidth="1.5"/>
-                    {/* Profile initial or image placeholder */}
-                    <text x="296" y="32" fontFamily="Arial" fontSize="20" fontWeight="bold" fill="white" textAnchor="middle" dominantBaseline="middle">{user?.name?.charAt(0)?.toUpperCase() || 'M'}</text>
+                    {/* Square profile frame without border */}
+                    {/* <rect x="252" y="7" width="58" height="58" fill="white" rx="8" ry="8"/> */}
+                    {user?.profile?.personalInfo?.profilePicture ? (
+                      <>
+                        <defs>
+                          <clipPath id="profileClip">
+                            <rect x="252" y="7" width="56" height="56" rx="8" ry="8"/>
+                          </clipPath>
+                        </defs>
+                        <image
+                          href={user.profile.personalInfo.profilePicture.startsWith('/uploads/') 
+                            ? user.profile.personalInfo.profilePicture 
+                            : `/uploads/profile-pictures/${user.profile.personalInfo.profilePicture?.split('/').pop()}`}
+                          x="245"
+                          y="2"
+                          width="70"
+                          height="70"
+                          clipPath="url(#profileClip)"
+                          preserveAspectRatio="xMidYMid meet"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        {/* Profile initial fallback */}
+                        <rect x="252" y="7" width="56" height="56" fill="url(#greenAccent)" rx="8" ry="8"/>
+                        <text x="280" y="35" fontFamily="Arial" fontSize="24" fontWeight="bold" fill="white" textAnchor="middle" dominantBaseline="middle">{user?.name?.charAt(0)?.toUpperCase() || 'M'}</text>
+                      </>
+                    )}
                   </g>
                   
                   {/* Member name section */}
-                  <text x="70" y="75" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="1">MEMBER NAME</text>
-                  <text x="70" y="92" fontFamily="Arial, sans-serif" fontSize="13" fontWeight="bold" fill="white">{user?.name?.substring(0, 20) || 'Member Name'}</text>
+                  <text x="70" y="95" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="1">MEMBER NAME</text>
+                  <text x="70" y="115" fontFamily="Arial, sans-serif" fontSize="13" fontWeight="bold" fill="white">{user?.name?.substring(0, 20) || 'Member Name'}</text>
                   
                   {/* Membership number (similar to card number) */}
-                  <text x="70" y="120" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="0.5">MEMBERSHIP No</text>
-                  <text x="70" y="138" fontFamily="monospace" fontSize="14" fontWeight="bold" fill="white" letterSpacing="2">{(user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'N/A').substring(0, 16)}</text>
+                  <text x="70" y="130" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="0.5">MEMBERSHIP No</text>
+                  <text x="70" y="150" fontFamily="monospace" fontSize="14" fontWeight="bold" fill="white" letterSpacing="2">{(user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'N/A').substring(0, 16)}</text>
                   
-                  {/* Expiry date */}
-                  <text x="70" y="162" fontFamily="Arial, sans-serif" fontSize="7" fill="#10b981" fontWeight="700">VALID THRU</text>
-                  <text x="70" y="174" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="white">12/26</text>
                   
-                  {/* Membership type */}
-                  <text x="150" y="162" fontFamily="Arial, sans-serif" fontSize="7" fill="#10b981" fontWeight="700">TYPE</text>
-                  <text x="150" y="174" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="white">{membershipStatus?.membership?.membershipType?.toUpperCase() || 'PERSONAL'}</text>
-                  
-                  {/* Status badge with green */}
-                  <rect x="240" y="155" width="80" height="28" fill="rgba(16, 185, 129, 0.2)" stroke="#10b981" strokeWidth="1.5" rx="4" ry="4"/>
-                  <text x="280" y="175" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="#10b981" textAnchor="middle">✓ ACTIVE</text>
+                  {/* Membership type and phone number side by side */}
+                  <g>
+                    {/* Left side - Membership type */}
+                    <text x="70" y="170" fontFamily="Arial, sans-serif" fontSize="7" fill="#10b981" fontWeight="700">TYPE</text>
+                    <text x="70" y="185" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="white">
+                      {membershipStatus?.membership?.membershipType?.toUpperCase() || 'PERSONAL'}
+                    </text>
+                    
+                    {/* Right side - Phone number */}
+                    <text x="266" y="170" fontFamily="Arial, sans-serif" fontSize="7" fill="#10b981" fontWeight="700" textAnchor="end">PHONE</text>
+                    <text x="266" y="185" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="white" textAnchor="end">
+                      {user?.profile?.contactInfo?.phone || 'N/A'}
+                    </text>
+                  </g>
                   
                   {/* Bottom accent bar with green */}
                   <rect y="192" width="336" height="20" fill="rgba(16, 185, 129, 0.15)"/>

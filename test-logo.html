@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Logo Test</title>
+</head>
+<body>
+    <h1>Logo Loading Test</h1>
+    
+    <h2>XAMPP Path:</h2>
+    <img src="/tutorial2/logo.png" alt="Logo XAMPP" style="border: 1px solid purple;" onerror="console.error('XAMPP logo failed'); this.style.border='2px solid purple'">
+    
+    <h2>Direct Image:</h2>
+    <img src="/logo.png" alt="Logo" style="border: 1px solid red;" onerror="console.error('Direct logo failed'); this.style.border='2px solid red'">
+    
+    <h2>Public Path:</h2>
+    <img src="/public/logo.png" alt="Logo Public" style="border: 1px solid blue;" onerror="console.error('Public logo failed'); this.style.border='2px solid blue'">
+    
+    <h2>Relative Path:</h2>
+    <img src="./logo.png" alt="Logo Relative" style="border: 1px solid green;" onerror="console.error('Relative logo failed'); this.style.border='2px solid green'">
+    
+    <h2>Canvas Test:</h2>
+    <canvas id="logoCanvas" width="200" height="200" style="border: 1px solid orange;"></canvas>
+    
+    <script>
+        console.log('Testing logo loading...');
+        
+        // Test canvas loading
+        const canvas = document.getElementById('logoCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'anonymous';
+        
+        logoImg.onload = function() {
+            console.log('✅ Canvas logo loaded successfully');
+            console.log('Dimensions:', logoImg.naturalWidth, 'x', logoImg.naturalHeight);
+            ctx.drawImage(logoImg, 10, 10, 80, 80);
+        };
+        
+        logoImg.onerror = function(event) {
+            console.error('❌ Canvas logo failed:', event);
+            console.error('Src was:', logoImg.src);
+            ctx.fillStyle = 'red';
+            ctx.font = '20px Arial';
+            ctx.fillText('FAILED', 10, 50);
+        };
+        
+        // Start with XAMPP path
+        logoImg.src = '/tutorial2/logo.png';
+        
+        // Log all image loads
+        document.querySelectorAll('img').forEach((img, index) => {
+            img.onload = function() {
+                console.log(`✅ Image ${index + 1} loaded:`, img.src);
+            };
+            img.onerror = function(event) {
+                console.error(`❌ Image ${index + 1} failed:`, img.src, event);
+            };
+        });
+    </script>
+</body>
+</html>

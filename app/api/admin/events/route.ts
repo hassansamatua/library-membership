@@ -45,6 +45,8 @@ function normalizeEventRow(row: any) {
   const time = row.time ?? toTimeString(start);
   const maxAttendees = row.maxAttendees ?? row.max_attendees ?? row.capacity ?? row.max_attendee ?? row.maxCapacity ?? null;
   const currentAttendees = row.currentAttendees ?? row.current_attendees ?? row.attendee_count ?? row.attendees ?? 0;
+  const fee = row.fee !== undefined ? parseFloat(row.fee) : 0;
+  const isFree = row.isFree !== undefined ? Boolean(row.isFree) : (fee <= 0);
 
   return {
     id: row.id,
@@ -55,9 +57,13 @@ function normalizeEventRow(row: any) {
     location: row.location ?? '',
     maxAttendees: maxAttendees === null || maxAttendees === undefined ? null : Number(maxAttendees),
     currentAttendees: Number(currentAttendees) || 0,
+    fee,
+    isFree,
     status: row.status ?? 'upcoming',
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : row.createdAt ?? null,
-    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : row.updatedAt ?? null
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : row.updatedAt ?? null,
+    // Include the original start_time for reference
+    start_time: row.start_time
   };
 }
 
@@ -95,10 +101,9 @@ export async function GET(request: Request) {
     let events: RowDataPacket[] = [];
     try {
       const [rows] = await connection.query<RowDataPacket[]>(
-        `SELECT e.*, COUNT(a.id) as attendee_count
+        `SELECT e.*, 
+           (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id = e.id) as attendee_count
          FROM events e
-         LEFT JOIN attendance a ON e.id = a.event_id
-         GROUP BY e.id
          ORDER BY e.created_at DESC`
       );
       events = rows;
@@ -161,6 +166,7 @@ export async function POST(request: Request) {
     const time = body?.time || null;
     const capacityRaw = body?.maxAttendees ?? body?.max_attendees ?? body?.capacity ?? null;
     const capacity = capacityRaw === null || capacityRaw === undefined || capacityRaw === '' ? null : Number(capacityRaw);
+    const fee = body?.fee !== undefined ? parseFloat(body.fee) : 0;
 
     if (!title) {
       return NextResponse.json({ message: 'Title is required' }, { status: 400 });
@@ -178,8 +184,8 @@ export async function POST(request: Request) {
       const endTime = addHoursToMysqlDateTime(startTime, 2);
 
       const [result] = await connection.query<ResultSetHeader>(
-        'INSERT INTO events (title, description, location, start_time, end_time, capacity, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [title, description, location, startTime, endTime, capacity, status, decoded.id]
+        'INSERT INTO events (title, description, location, start_time, end_time, capacity, status, created_by, fee) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [title, description, location, startTime, endTime, capacity, status, decoded.id, fee]
       );
 
       const [rows] = await connection.query<RowDataPacket[]>('SELECT * FROM events WHERE id = ?', [result.insertId]);
@@ -197,8 +203,8 @@ export async function POST(request: Request) {
       }
 
       const [result] = await connection.query<ResultSetHeader>(
-        'INSERT INTO events (title, description, location, start_date, end_date, max_attendees, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [title, description, location, startDate, String(endDate), capacity, status, decoded.id]
+        'INSERT INTO events (title, description, location, start_date, end_date, max_attendees, status, created_by, fee) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [title, description, location, startDate, String(endDate), capacity, status, decoded.id, fee]
       );
 
       const [rows] = await connection.query<RowDataPacket[]>('SELECT * FROM events WHERE id = ?', [result.insertId]);

@@ -51,7 +51,7 @@ function getPlanAmounts(args: { type: 'personal' | 'organization'; newUser: bool
   return { baseAmount: args.newUser ? 40000 : 30000 };
 }
 
-// NEW: Calculate penalties based on sophisticated rules
+// Calculate penalties based on sophisticated rules
 function calculatePenalties(args: {
   baseAmount: number;
   dueDate: Date;
@@ -59,27 +59,11 @@ function calculatePenalties(args: {
   newUser: boolean;
   registrationDate?: Date;
 }) {
-  const { baseAmount, dueDate, now, newUser, registrationDate } = args;
+  const { baseAmount, dueDate, now, newUser } = args;
   
-  // NEW USERS: No penalties for entire first cycle if registered in December
-  if (newUser && registrationDate) {
-    const regMonth = registrationDate.getMonth();
-    const regYear = registrationDate.getFullYear();
-    const currentYear = now.getFullYear();
-    
-    // If registered in December of previous year, no penalties for entire first cycle
-    if (regMonth === 11 && regYear === currentYear - 1) {
-      return { penaltyAmount: 0, totalDue: baseAmount, penaltyMonths: 0 };
-    }
-    
-    // For new users, check if they're still in their first payment cycle
-    // First cycle runs from registration date until March 31 of next year
-    const firstCycleEnd = new Date(regYear + 1, 2, 31); // March 31 of registration year
-    const isInFirstCycle = now.getTime() <= firstCycleEnd.getTime();
-    
-    if (isInFirstCycle) {
-      return { penaltyAmount: 0, totalDue: baseAmount, penaltyMonths: 0 };
-    }
+  // NEW USERS: No penalties for new users
+  if (newUser) {
+    return { penaltyAmount: 0, totalDue: baseAmount, penaltyMonths: 0 };
   }
   
   // Calculate months overdue
@@ -151,29 +135,48 @@ export async function GET(request: Request) {
     const membership = membershipRows?.[0] || null;
     const hasMembership = !!membership;
 
-    // NEW: Check for completed payment in membership_payments table
+    // Get all completed payments from both tables without year restrictions
     const [paymentRows] = await connection.query(
-      'SELECT * FROM membership_payments WHERE user_id = ? AND status = "completed" ORDER BY payment_date DESC LIMIT 1',
-      [decoded.id]
+      `SELECT 
+        p.id, p.user_id, p.amount, p.payment_method, p.reference,
+        p.status, p.paid_at as payment_date, p.created_at, p.updated_at,
+        'payment' as source
+       FROM payments p
+       WHERE p.user_id = ? 
+       AND p.status = 'completed' 
+       AND (p.paid_at IS NOT NULL AND p.paid_at <= NOW())
+       UNION
+       SELECT 
+        mp.id, mp.user_id, mp.amount, mp.payment_method, mp.reference,
+        mp.status, mp.payment_date, mp.created_at, mp.updated_at,
+        'membership_payment' as source
+       FROM membership_payments mp
+       WHERE mp.user_id = ? 
+       AND mp.status = 'completed' 
+       AND (mp.payment_date IS NOT NULL AND mp.payment_date <= NOW())
+       ORDER BY payment_date DESC`,
+      [decoded.id, decoded.id]
     ) as any[];
-
+    
+    // Check if user has any completed payments at all
+    const hasAnyPayment = paymentRows.length > 0;
     const completedPayment = paymentRows?.[0] || null;
-    const hasCompletedPayment = !!completedPayment;
 
+    // User is new if they have no completed payments in either table
     const newUser = newUserParam != null
       ? newUserParam === 'true' || newUserParam === '1'
-      : !hasMembership;
+      : !hasAnyPayment; // Only check payment history, not membership
 
     const planType = typeParam === 'personal' || typeParam === 'organization' ? type : defaultType;
     const { baseAmount } = getPlanAmounts({ type: planType, newUser });
 
-    // NEW: Use sophisticated penalty calculation
+    // Calculate penalties based on the current date
     const { penaltyAmount, totalDue, penaltyMonths } = calculatePenalties({
       baseAmount,
       dueDate: cycle.dueDate,
       now,
-      newUser,
-      registrationDate
+      newUser, // Use the newUser status we just determined
+      registrationDate: registrationDate ? new Date(registrationDate) : undefined
     });
 
     const membershipExpiry = membership?.expiry_date ? new Date(membership.expiry_date) : null;
@@ -188,12 +191,12 @@ export async function GET(request: Request) {
     const userProfile = profileRows[0] || {};
     const hasProfilePicture = Boolean(userProfile.profile_picture && userProfile.profile_picture !== '' && userProfile.profile_picture !== null);
 
-    // NEW: Active status depends on completed payment and membership existence
+    // Active status depends on completed payment and membership existence
     const active = Boolean(
       membership && 
       membership.status === 'active' && 
       activeByDate && 
-      hasCompletedPayment
+      hasAnyPayment
     );
 
     const effectiveFees = active
@@ -210,7 +213,7 @@ export async function GET(request: Request) {
       },
       plan: {
         type: planType,
-        newUser
+        newUser: !hasAnyPayment // User is new only if they have no payments at all
       },
       fees: effectiveFees,
       // NEW: Add penalty breakdown for transparency
@@ -229,10 +232,13 @@ export async function GET(request: Request) {
             paymentStatus: membership.payment_status,
             joinedDate: membership.joined_date,
             expiryDate: membership.expiry_date,
-            amountPaid: membership.amount_paid
+            amountPaid: membership.amount_paid,
+            payment_date: membership.payment_date
           }
         : null,
-      canAccessIdCard: hasCompletedPayment
+      payments: paymentRows, // Include all payment history
+      hasCompletedPayment: hasAnyPayment, // Explicit flag for completed payments
+canAccessIdCard: hasAnyPayment
     });
   } catch (error) {
     if ((error as any)?.code === 'ER_NO_SUCH_TABLE') {

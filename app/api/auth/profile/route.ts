@@ -60,6 +60,20 @@ const toBoolean = (value: unknown) => {
   return false;
 };
 
+// Helper function to get image dimensions
+async function getImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.onerror = () => {
+      resolve(null);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 const normalizeProfile = (row: any) => {
   return {
     personalInfo: {
@@ -73,7 +87,7 @@ const normalizeProfile = (row: any) => {
     },
     contactInfo: {
       email: row.email || '',
-      phone: row.phone_number || '',
+      phone: row.phone || row.phone_number || '',
       address: row.address || '',
       city: row.city || '',
       country: row.country || '',
@@ -147,11 +161,12 @@ async function updateProfileWithFormData(connection: PoolConnection, decodedId: 
   const idNumber = (personalInfo as any).id_number || (personalInfo as any).idNumber || null;
   const nationality = (personalInfo as any).nationality || null;
   const placeOfBirth = (personalInfo as any).place_of_birth || (personalInfo as any).placeOfBirth || null;
-  const phone = (personalInfo as any).phone || (contactInfo as any)?.phone || null;
-  const address = (personalInfo as any).address || (contactInfo as any)?.address || null;
-  const city = (personalInfo as any).city || (contactInfo as any)?.city || null;
-  const country = (personalInfo as any).country || (contactInfo as any)?.country || null;
-  const postalCode = (personalInfo as any).postal_code || (personalInfo as any).postalCode || (contactInfo as any)?.postalCode || null;
+  // Get phone number from contactInfo first, then fall back to personalInfo
+  const phone = (contactInfo as any)?.phone || (personalInfo as any).phone_number || null;
+  const address = (contactInfo as any)?.address || (personalInfo as any).address || null;
+  const city = (contactInfo as any)?.city || (personalInfo as any).city || null;
+  const country = (contactInfo as any)?.country || (personalInfo as any).country || null;
+  const postalCode = (contactInfo as any)?.postalCode || (personalInfo as any).postal_code || (personalInfo as any).postalCode || null;
 
   if (dob) profileUpdate.date_of_birth = dob;
   if (gender) profileUpdate.gender = gender;
@@ -176,6 +191,38 @@ async function updateProfileWithFormData(connection: PoolConnection, decodedId: 
   }
 
   if (profilePicture && profilePicture.size > 0) {
+    // Validate profile picture size and dimensions
+    const maxSize = 5 * 1024 * 1024; // 5MB max
+    const minWidth = 200;
+    const minHeight = 200;
+    const maxWidth = 2000;
+    const maxHeight = 2000;
+    
+    if (profilePicture.size > maxSize) {
+      return NextResponse.json(
+        { success: false, message: 'Profile picture too large. Maximum size is 5MB.' },
+        { status: 400 }
+      );
+    }
+    
+    // Check image dimensions
+    const dimensions = await getImageDimensions(profilePicture);
+    if (dimensions) {
+      const { width, height } = dimensions;
+      if (width < minWidth || height < minHeight) {
+        return NextResponse.json(
+          { success: false, message: `Profile picture too small. Minimum dimensions are ${minWidth}x${minHeight}px.` },
+          { status: 400 }
+        );
+      }
+      if (width > maxWidth || height > maxHeight) {
+        return NextResponse.json(
+          { success: false, message: `Profile picture too large. Maximum dimensions are ${maxWidth}x${maxHeight}px.` },
+          { status: 400 }
+        );
+      }
+    }
+    
     const fileExtension = profilePicture.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExtension}`;
     const filePath = path.join(UPLOAD_DIR, fileName);
