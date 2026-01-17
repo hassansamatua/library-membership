@@ -200,28 +200,11 @@ export default function MembershipCardPage() {
     
     // Draw logo with fallback text if image fails
     if (ctx) {
-      // White square background with rounded corners
-      ctx.fillStyle = 'white';
-      const logoSize = 56;
-      const logoX = 72;
-      const logoY = 47; // Moved down to match profile image position (52 - 5)
-      const radius = 8;
+      const logoSize = 60; // Size for the logo
+      const logoX = 0; // Aligned to the left edge
+      const logoY = 40; // Slightly higher position
       
-      console.log('🔲 Drawing logo background at:', logoX, logoY, 'size:', logoSize);
-      
-      // Draw rounded rectangle
-      ctx.beginPath();
-      ctx.moveTo(logoX + radius, logoY);
-      ctx.lineTo(logoX + logoSize - radius, logoY);
-      ctx.quadraticCurveTo(logoX + logoSize, logoY, logoX + logoSize, logoY + radius);
-      ctx.lineTo(logoX + logoSize, logoY + logoSize - radius);
-      ctx.quadraticCurveTo(logoX + logoSize, logoY + logoSize, logoX + logoSize - radius, logoY + logoSize);
-      ctx.lineTo(logoX + radius, logoY + logoSize);
-      ctx.quadraticCurveTo(logoX, logoY + logoSize, logoX, logoY + logoSize - radius);
-      ctx.lineTo(logoX, logoY + radius);
-      ctx.quadraticCurveTo(logoX, logoY, logoX + radius, logoY);
-      ctx.closePath();
-      ctx.fill();
+      console.log('🔲 Drawing logo at:', logoX, logoY, 'size:', logoSize);
       
       // Load and draw logo image with fallback
       const logoImg = new Image();
@@ -233,18 +216,24 @@ export default function MembershipCardPage() {
         if (ctx && !logoDrawn) {
           console.log('🖼️ Drawing logo at:', logoX, logoY, 'size:', logoSize);
           
-          // Create clipping path to match the frame
-          ctx.save();
-          ctx.beginPath();
-          ctx.roundRect(logoX, logoY, logoSize, logoSize, 8);
-          ctx.clip();
+          // Draw logo with aspect ratio preserved, no background
+          const aspectRatio = logoImg.naturalWidth / logoImg.naturalHeight;
+          let drawWidth = logoSize;
+          let drawHeight = logoSize;
           
-          // Draw larger logo to fill frame completely
-          const largerSize = 60; // Reduced from 70 for more zoom out
-          const largerX = logoX - (largerSize - logoSize) / 2;
-          const largerY = logoY - (largerSize - logoSize) / 2;
-          ctx.drawImage(logoImg, largerX, largerY, largerSize, largerSize);
-          ctx.restore();
+          // Maintain aspect ratio
+          if (aspectRatio > 1) {
+            drawHeight = logoSize / aspectRatio;
+          } else {
+            drawWidth = logoSize * aspectRatio;
+          }
+          
+          // Center the logo in the container
+          const offsetX = (logoSize - drawWidth) / 2;
+          const offsetY = (logoSize - drawHeight) / 2;
+          
+          // Draw the logo image directly without any background
+          ctx.drawImage(logoImg, logoX + offsetX, logoY + offsetY, drawWidth, drawHeight);
           
           logoDrawn = true;
         }
@@ -290,7 +279,7 @@ export default function MembershipCardPage() {
         }
       }, 2000);
       
-      logoImg.src = '/logo.png'; // Use the correct path that works
+      logoImg.src = '/logo (3).png'; // Using the new logo file
     }
 
     function loadProfileImage() {
@@ -304,9 +293,9 @@ export default function MembershipCardPage() {
       ctx.shadowOffsetX = 2;
       ctx.shadowOffsetY = 2;
       
-      const profileSize = 56;
-      const profileX = canvas.width - 128; // Position from right edge
-      const profileY = 42;
+      const profileSize = 90; // Slightly reduced from 100
+      const profileX = canvas.width - 138; // Moved right by 10px
+      const profileY = 82; // Moved up from 92 to 82
       const radius = 8;
       
       console.log('🔲 Drawing profile background at:', profileX, profileY, 'size:', profileSize);
@@ -337,16 +326,16 @@ export default function MembershipCardPage() {
         profileImg.onload = () => {
           console.log('✅ Profile image loaded successfully');
           if (ctx) {
-            // Draw profile image zoomed out and moved down more
-            const imageSize = 70; // Smaller size for zoom out effect
-            const imageWidth = 70; // Make it square for consistent scaling
-            const imageX = canvas.width - 128 - (imageWidth - 56) / 2; // Center in 56px frame
-            const imageY = 52 - (imageSize - 56) / 2; // Moved down 5 more pixels from 47 to 52
+            // Draw profile image with maximum zoom out to show as much as possible
+            const imageSize = 60; // Reduced from 70 (more zoomed out)
+            const imageWidth = 60; // Make it square for consistent scaling
+            const imageX = profileX - (imageWidth - profileSize) / 2; // Center in 56px frame
+            const imageY = profileY - (imageSize - profileSize) / 2;
             
             // Create clipping path to match the frame
             ctx.save();
             ctx.beginPath();
-            ctx.roundRect(canvas.width - 128, 42, 56, 56, 8);
+            ctx.roundRect(profileX, profileY, profileSize, profileSize, 8);
             ctx.clip();
             
             ctx.drawImage(profileImg, imageX, imageY, imageWidth, imageSize);
@@ -361,9 +350,9 @@ export default function MembershipCardPage() {
           // Fallback to initial if image fails to load
           if (ctx) {
             // Draw fallback in square frame
-            const fallbackX = canvas.width - 128;
-            const fallbackY = 42;
-            const fallbackSize = 56;
+            const fallbackX = profileX;
+            const fallbackY = profileY;
+            const fallbackSize = profileSize;
             
             // Green background
             ctx.fillStyle = '#4ade80';
@@ -386,9 +375,9 @@ export default function MembershipCardPage() {
             console.warn('Profile image loading timeout, using fallback');
             if (ctx) {
               // Draw timeout fallback in square frame
-              const fallbackX = canvas.width - 128;
-              const fallbackY = 42;
-              const fallbackSize = 56;
+              const fallbackX = profileX;
+              const fallbackY = profileY;
+              const fallbackSize = profileSize;
               
               // Green background
               ctx.fillStyle = '#4ade80';
@@ -414,9 +403,9 @@ export default function MembershipCardPage() {
         // Draw profile picture or initial - exact colors
         if (ctx) {
           // Draw no-profile fallback in square frame
-          const fallbackX = canvas.width - 128;
-          const fallbackY = 42;
-          const fallbackSize = 56;
+          const fallbackX = profileX;
+          const fallbackY = profileY;
+          const fallbackSize = profileSize;
           
           // Green background
           ctx.fillStyle = '#4ade80';
@@ -444,35 +433,38 @@ export default function MembershipCardPage() {
     function drawCardContent() {
       if (!ctx) return;
       
-      // Draw organization name - exact positioning and colors
+      // Draw organization name - adjusted to prevent collision with logo
       ctx.fillStyle = 'white';
-      ctx.font = 'bold 32px Arial';
+      ctx.font = 'bold 28px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText('Tanzania Library and', canvas.width / 2, 64);
-      ctx.fillText('Information Association', canvas.width / 2, 96);
+      // Position text to the right of the logo with proper spacing
+      const textStartX = 90; // Start text after the logo with 20px margin
+      ctx.fillText('TANZANIA LIBRARY AND', textStartX, 64);
+      ctx.fillText('INFORMATION ASSOCIATION', textStartX, 96);
       
-      ctx.font = '24px Arial';
+      ctx.font = '20px Arial';
       ctx.fillStyle = '#bbf7d0'; // green-100 (exact match)
-      ctx.fillText('(TLA)', canvas.width / 2, 124);
+      ctx.fillText('(TLA)', textStartX, 124);
 
-      // Draw member name section - exact positioning
+      // Draw member name section - aligned with text
       ctx.fillStyle = '#bbf7d0'; // green-100 (exact match)
       ctx.font = '20px Arial';
       ctx.textAlign = 'left';
-      ctx.fillText('MEMBER NAME', 80, 184);
       
-      ctx.fillStyle = 'white';
-      ctx.font = 'bold 24px Arial';
-      ctx.fillText(user?.name || 'Member Name', 80, 212);
+      // Draw member name
+      ctx.fillStyle = '#1a365d';
+      ctx.font = 'bold 16px Arial';
+      ctx.fillText(user?.name || 'Member Name', 90, 100);
 
-      // Draw membership number and phone - exact colors
-      ctx.fillStyle = '#bbf7d0'; // green-100 (exact match)
-      ctx.font = '20px Arial';
-      ctx.fillText('MEMBERSHIP No:', 80, 256);
-      
-      ctx.fillStyle = 'white';
-      ctx.font = 'bold 24px monospace';
-      ctx.fillText(user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'N/A', 80, 284);
+      // Draw membership number
+      ctx.fillStyle = '#4a5568';
+      ctx.font = '14px Arial';
+      ctx.fillText(`ID: ${user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'N/A'}`, 72, 125);
+
+      // Draw membership type - aligned with TLA logo left edge (x=72)
+      ctx.fillStyle = '#4a5568';
+      ctx.font = '14px Arial';
+      ctx.fillText(`Type: ${membershipStatus?.membership?.membershipType || 'Standard'}`, 72, 145);
 
       ctx.fillStyle = '#bbf7d0'; // green-100 (exact match)
       ctx.font = '20px Arial';
@@ -653,8 +645,8 @@ export default function MembershipCardPage() {
             <text x="36" y="28" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#059669" text-anchor="middle" dominant-baseline="middle">TLA</text>
             
             <!-- Organization name -->
-            <text x="168" y="32" font-family="Arial" font-size="12" font-weight="900" fill="white" text-anchor="middle">Tanzania Library and</text>
-            <text x="168" y="48" font-family="Arial" font-size="12" font-weight="900" fill="white" text-anchor="middle">Information Association</text>
+            <text x="168" y="32" font-family="Arial" font-size="12" font-weight="900" fill="white" text-anchor="middle">TANZANIA LIBRARY AND</text>
+            <text x="168" y="48" font-family="Arial" font-size="12" font-weight="900" fill="white" text-anchor="middle">INFORMATION ASSOCIATION</text>
             <text x="168" y="62" font-family="Arial" font-size="10" fill="#10b981" text-anchor="middle" font-weight="600">(TLA)</text>
             
             <!-- Profile picture with proper fallback -->
@@ -665,15 +657,15 @@ export default function MembershipCardPage() {
               <!-- Profile initial or image placeholder -->
               <text x="296" y="32" font-family="Arial" font-size="20" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">${user?.name?.charAt(0)?.toUpperCase() || 'M'}</text>
             </g>
-            <!-- Member name section -->
-            <text x="70" y="75" font-family="Arial, sans-serif" font-size="8" fill="#10b981" font-weight="700" letter-spacing="1">MEMBER NAME</text>
-            <text x="70" y="92" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">${user?.name?.substring(0, 20) || 'Member Name'}</text>
+            <!-- Member name section - aligned with TLA logo left edge (x=16) -->
+            <text x="16" y="75" font-family="Arial, sans-serif" font-size="8" fill="#10b981" font-weight="700" letter-spacing="1">MEMBER NAME</text>
+            <text x="16" y="92" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">${user?.name?.substring(0, 20) || 'Member Name'}</text>
             
-            <!-- Membership number (similar to card number) -->
+            <!-- Membership number - aligned with TLA logo left edge (x=16) -->
             <g>
-              <text x="70" y="120" font-family="Arial, sans-serif" font-size="8" fill="#10b981" font-weight="700" letter-spacing="0.5">MEMBERSHIP No</text>
+              <text x="16" y="120" font-family="Arial, sans-serif" font-size="8" fill="#10b981" font-weight="700" letter-spacing="0.5">MEMBERSHIP No</text>
               <!-- Display membership number as spaced groups -->
-              <text x="70" y="138" font-family="monospace" font-size="14" font-weight="bold" fill="white" letter-spacing="2">${(user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'N/A').substring(0, 16).split('').join(' ')}</text>
+              <text x="16" y="138" font-family="monospace" font-size="14" font-weight="bold" fill="white" letter-spacing="2">${(user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'N/A').substring(0, 16).split('').join(' ')}</text>
             </g>
             
             <!-- Bottom section with details -->
@@ -1001,81 +993,73 @@ export default function MembershipCardPage() {
                   {/* Top header bar with green */}
                   <rect width="336" height="50" fill="rgba(16, 185, 129, 0.2)" rx="16" ry="16"/>
                   
-                  {/* Square logo frame without border */}
-                  <rect x="22" y="12" width="56" height="56" fill="white" rx="8" ry="8"/>
-                  {/* Actual Logo Image with clipping */}
-                  <defs>
-                    <clipPath id="logoClip">
-                      <rect x="22" y="12" width="56" height="56" rx="8" ry="8"/>
-                    </clipPath>
-                  </defs>
+                  {/* Logo Image without background */}
                   <image
-                    href="/logo.png"
-                    x="20"
-                    y="8.5"
-                    width="60"
-                    height="60"
-                    clipPath="url(#logoClip)"
+                    href="/logo (3).png"
+                    x="-20"
+                    y="-20"
+                    width="130"
+                    height="130"
                     preserveAspectRatio="xMidYMid meet"
                   />
                   
                   {/* Organization name */}
-                  <text x="168" y="42" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">Tanzania Library and</text>
-                  <text x="168" y="58" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">Information Association</text>
-                  <text x="168" y="72" fontFamily="Arial" fontSize="10" fill="#10b981" textAnchor="middle" fontWeight="600">(TLA)</text>
+                  <text x="190" y="30" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">TANZANIA LIBRARY AND</text>
+                  <text x="190" y="50" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">INFORMATION ASSOCIATION</text>
+                  <text x="175" y="70" fontFamily="Arial" fontSize="10" fill="#10b981" textAnchor="middle" fontWeight="600">(TLA)</text>
                   
                   {/* Profile picture with square frame and clipping */}
                   <g>
                     {/* Square profile frame without border */}
-                    {/* <rect x="252" y="7" width="58" height="58" fill="white" rx="8" ry="8"/> */}
+                    <rect x="233" y="67" width="90" height="90" fill="none" rx="8" ry="8"/>
                     {user?.profile?.personalInfo?.profilePicture ? (
                       <>
                         <defs>
                           <clipPath id="profileClip">
-                            <rect x="252" y="7" width="56" height="56" rx="8" ry="8"/>
+                            <rect x="233" y="67" width="90" height="90" rx="8" ry="8"/>
                           </clipPath>
                         </defs>
                         <image
                           href={user.profile.personalInfo.profilePicture.startsWith('/uploads/') 
                             ? user.profile.personalInfo.profilePicture 
                             : `/uploads/profile-pictures/${user.profile.personalInfo.profilePicture?.split('/').pop()}`}
-                          x="245"
-                          y="2"
-                          width="70"
-                          height="70"
+                          x="233"
+                          y="67"
+                          width="90"
+                          height="90"
                           clipPath="url(#profileClip)"
-                          preserveAspectRatio="xMidYMid meet"
+                          preserveAspectRatio="xMidYMid slice"
                         />
                       </>
                     ) : (
                       <>
                         {/* Profile initial fallback */}
-                        <rect x="252" y="7" width="56" height="56" fill="url(#greenAccent)" rx="8" ry="8"/>
-                        <text x="280" y="35" fontFamily="Arial" fontSize="24" fontWeight="bold" fill="white" textAnchor="middle" dominantBaseline="middle">{user?.name?.charAt(0)?.toUpperCase() || 'M'}</text>
+                        <rect x="233" y="67" width="90" height="90" fill="url(#greenAccent)" rx="8" ry="8"/>
+                        <text x="278" y="112" fontFamily="Arial" fontSize="40" fontWeight="bold" fill="white" textAnchor="middle" dominantBaseline="middle">{user?.name?.charAt(0)?.toUpperCase() || 'M'}</text>
                       </>
                     )}
                   </g>
                   
                   {/* Member name section */}
-                  <text x="70" y="95" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="1">MEMBER NAME</text>
-                  <text x="70" y="115" fontFamily="Arial, sans-serif" fontSize="13" fontWeight="bold" fill="white">{user?.name?.substring(0, 20) || 'Member Name'}</text>
+                  <text x="20" y="95" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="1">MEMBER NAME</text>
+                  <text x="20" y="115" fontFamily="Arial, sans-serif" fontSize="13" fontWeight="bold" fill="white">{user?.name?.substring(0, 20) || 'Member Name'}</text>
                   
                   {/* Membership number (similar to card number) */}
-                  <text x="70" y="130" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="0.5">MEMBERSHIP No</text>
-                  <text x="70" y="150" fontFamily="monospace" fontSize="14" fontWeight="bold" fill="white" letterSpacing="2">{(user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'N/A').substring(0, 16)}</text>
+                  <text x="20" y="130" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="0.5">MEMBERSHIP No</text>
+                  <text x="20" y="150" fontFamily="monospace" fontSize="14" fontWeight="bold" fill="white" letterSpacing="2">{(user?.membershipNumber || membershipStatus?.membership?.membershipNumber || 'N/A').substring(0, 16)}</text>
                   
                   
                   {/* Membership type and phone number side by side */}
                   <g>
                     {/* Left side - Membership type */}
-                    <text x="70" y="170" fontFamily="Arial, sans-serif" fontSize="7" fill="#10b981" fontWeight="700">TYPE</text>
-                    <text x="70" y="185" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="white">
+                    <text x="20" y="170" fontFamily="Arial, sans-serif" fontSize="7" fill="#10b981" fontWeight="700">TYPE</text>
+                    <text x="20" y="185" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="white">
                       {membershipStatus?.membership?.membershipType?.toUpperCase() || 'PERSONAL'}
                     </text>
                     
                     {/* Right side - Phone number */}
-                    <text x="266" y="170" fontFamily="Arial, sans-serif" fontSize="7" fill="#10b981" fontWeight="700" textAnchor="end">PHONE</text>
-                    <text x="266" y="185" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="white" textAnchor="end">
+                    <text x="165" y="170" fontFamily="Arial, sans-serif" fontSize="7" fill="#10b981" fontWeight="700" textAnchor="end">PHONE</text>
+                    <text x="200" y="185" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="white" textAnchor="end">
                       {user?.profile?.contactInfo?.phone || 'N/A'}
                     </text>
                   </g>

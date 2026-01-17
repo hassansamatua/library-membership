@@ -264,6 +264,76 @@ export default function CompleteProfilePage() {
 
 
 
+  const validateAndProcessImage = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // Check file type
+      if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
+        reject(new Error('Only JPG and PNG files are allowed'));
+        return;
+      }
+
+      // Check file size (2MB max)
+      const maxSize = 2 * 1024 * 1024; // 2MB
+      if (file.size > maxSize) {
+        reject(new Error('File size must be less than 2MB'));
+        return;
+      }
+
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      
+      img.onload = async () => {
+        URL.revokeObjectURL(url);
+        
+        // Check minimum dimensions
+        const minDimension = 400;
+        if (img.width < minDimension || img.height < minDimension) {
+          reject(new Error(`Image must be at least ${minDimension}x${minDimension} pixels`));
+          return;
+        }
+
+        // Calculate dimensions for square crop
+        const size = Math.min(img.width, img.height);
+        const x = (img.width - size) / 2;
+        const y = (img.height - size) / 2;
+
+        // Create canvas for cropping and resizing
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          reject(new Error('Failed to process image'));
+          return;
+        }
+
+        // Set canvas size to 600x600 (optimal for membership card)
+        const outputSize = 600;
+        canvas.width = outputSize;
+        canvas.height = outputSize;
+
+        // Draw the cropped and resized image
+        ctx.drawImage(
+          img, 
+          x, y,           // Source x, y (crop start)
+          size, size,     // Source width, height (crop size)
+          0, 0,           // Destination x, y
+          outputSize, outputSize // Destination width, height
+        );
+
+        // Convert to base64
+        const base64Image = canvas.toDataURL('image/jpeg', 0.9);
+        resolve(base64Image);
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Failed to load image'));
+      };
+
+      img.src = url;
+    });
+  };
+
   const handleInputChange = (section: string, field: string, value: any) => {
     setFormData(prev => {
       if (section === 'documents') {
@@ -438,39 +508,64 @@ export default function CompleteProfilePage() {
             <div className="mt-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
               <div className="sm:col-span-6">
                 <label className="block text-sm font-medium text-gray-700">Profile Picture</label>
-                <div className="mt-2 flex items-center">
-                  <span className="h-12 w-12 rounded-full overflow-hidden bg-gray-100">
-                    {formData.personalInfo.profilePicture ? (
-                      <img
-                        src={formData.personalInfo.profilePicture}
-                        alt="Profile"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <FiUser className="h-full w-full text-gray-400" />
+                <div className="mt-2 flex items-start">
+                  <div className="relative">
+                    <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100">
+                      {formData.personalInfo.profilePicture ? (
+                        <img
+                          src={formData.personalInfo.profilePicture}
+                          alt="Profile Preview"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                          <FiUser className="h-12 w-12 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                    {formData.personalInfo.profilePicture && (
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('personalInfo', 'profilePicture', null)}
+                        className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1 text-white hover:bg-red-600 focus:outline-none"
+                        title="Remove photo"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
                     )}
-                  </span>
-                  <label className="ml-5 relative cursor-pointer bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    <span>Change</span>
-                    <input
-                      type="file"
-                      className="sr-only"
-                      accept=".jpg,.jpeg,.png"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file && file.size <= 2 * 1024 * 1024) { // 2MB limit
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            handleInputChange('personalInfo', 'profilePicture', reader.result);
-                          };
-                          reader.readAsDataURL(file);
-                        } else {
-                          toast.error('File size should be less than 2MB');
-                        }
-                      }}
-                    />
-                  </label>
-                  <p className="ml-4 text-xs text-gray-500">JPG, PNG (Max. 2MB)</p>
+                  </div>
+                  
+                  <div className="ml-5">
+                    <label className="relative cursor-pointer bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                      <span>{formData.personalInfo.profilePicture ? 'Change Photo' : 'Upload Photo'}</span>
+                      <input
+                        type="file"
+                        className="sr-only"
+                        accept="image/jpeg, image/png"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              const processedImage = await validateAndProcessImage(file);
+                              handleInputChange('personalInfo', 'profilePicture', processedImage);
+                            } catch (error) {
+                              toast.error(error instanceof Error ? error.message : 'Failed to process image');
+                            }
+                          }
+                        }}
+                      />
+                    </label>
+                    <p className="mt-2 text-xs text-gray-500">
+                      JPG or PNG (Min. 400×400px, Max. 2MB)
+                    </p>
+                    {formData.personalInfo.profilePicture && (
+                      <p className="mt-1 text-xs text-green-600">
+                        ✓ Photo meets requirements
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
