@@ -32,10 +32,12 @@ function toDateOnlyIso(date: Date) {
 
 function getCycleDates(now: Date) {
   const year = now.getFullYear();
-  const cycleYear = now.getMonth() >= 1 ? year : year - 1;
-  const cycleStart = new Date(cycleYear, 1, 1);
-  const dueDate = new Date(cycleYear, 2, 31);
-  const expiryDate = new Date(cycleYear + 1, 0, 31);
+  // Membership cycles ALWAYS run from February 1 to January 31
+  // Regardless of when payment is made, it covers the current cycle year
+  const cycleYear = year;
+  const cycleStart = new Date(cycleYear, 1, 1); // February 1st
+  const dueDate = new Date(cycleYear, 2, 31); // March 31st
+  const expiryDate = new Date(cycleYear + 1, 0, 31); // January 31st next year
   return {
     cycleYear,
     cycleStart,
@@ -199,6 +201,24 @@ export async function GET(request: Request) {
       hasAnyPayment
     );
 
+    console.log('🔍 Membership Status API Response:', {
+      today: now.toISOString(),
+      cycle: {
+        year: cycle.cycleYear,
+        startDate: toDateOnlyIso(cycle.cycleStart),
+        dueDate: toDateOnlyIso(cycle.dueDate),
+        expiryDate: toDateOnlyIso(cycle.expiryDate)
+      },
+      membership: membership ? {
+        expiryDate: membership.expiry_date,
+        status: membership.status,
+        paymentStatus: membership.payment_status
+      } : null,
+      active,
+      activeByDate,
+      hasAnyPayment
+    });
+
     const effectiveFees = active
       ? { baseAmount: 0, penaltyAmount: 0, totalDue: 0, currency: 'TZS' }
       : { baseAmount, penaltyAmount, totalDue, currency: 'TZS' };
@@ -238,7 +258,7 @@ export async function GET(request: Request) {
         : null,
       payments: paymentRows, // Include all payment history
       hasCompletedPayment: hasAnyPayment, // Explicit flag for completed payments
-canAccessIdCard: hasAnyPayment
+      canAccessIdCard: hasAnyPayment
     });
   } catch (error) {
     if ((error as any)?.code === 'ER_NO_SUCH_TABLE') {

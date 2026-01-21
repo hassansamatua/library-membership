@@ -27,11 +27,15 @@ interface MembershipCardData {
   membershipNumber: string;
   membershipType: string;
   joinDate: string;
+  joinedDate: string; // Added to match user API
   expiryDate: string;
   paymentStatus: 'paid' | 'pending' | 'overdue' | 'cancelled';
   membershipStatus: 'active' | 'inactive' | 'expired' | 'suspended';
+  status: 'active' | 'inactive' | 'expired' | 'suspended'; // Added to match user API
   amount: number;
+  amountPaid: number | string; // Added to match user API
   paymentDate: string | null;
+  payment_date: string | null; // Added to match user API
   lastPaymentAmount: number;
   profilePicture?: string | null;
 }
@@ -88,6 +92,23 @@ export default function AdminCardsPage() {
         }))
       });
       
+      console.log('🔍 Admin Cards Frontend Debug:', {
+        success: data.success,
+        totalCards: data.data?.length,
+        sampleCard: data.data?.[0],
+        sampleCardDates: data.data?.[0] ? {
+          joinDate: data.data[0].joinDate,
+          joinDateType: typeof data.data[0].joinDate,
+          expiryDate: data.data[0].expiryDate,
+          expiryDateType: typeof data.data[0].expiryDate,
+          paymentDate: data.data[0].paymentDate,
+          paymentDateType: typeof data.data[0].paymentDate,
+          formattedJoinDate: formatDate(data.data[0].joinDate),
+          formattedExpiryDate: formatDate(data.data[0].expiryDate),
+          formattedPaymentDate: formatDate(data.data[0].paymentDate)
+        } : 'No card data'
+      });
+      
       setCards(data.data || []);
     } catch (error) {
       console.error('Error fetching cards:', error);
@@ -140,8 +161,8 @@ Membership Card - ${card.membershipNumber}
 Name: ${card.userName}
 Email: ${card.userEmail}
 Membership Type: ${card.membershipType}
-Join Date: ${new Date(card.joinDate).toLocaleDateString()}
-Expiry Date: ${new Date(card.expiryDate).toLocaleDateString()}
+Join Date: ${formatDate(card.joinDate)}
+Expiry Date: ${formatDate(card.expiryDate)}
 Payment Status: ${card.paymentStatus}
 Membership Status: ${card.membershipStatus}
 Amount: TZS ${card.lastPaymentAmount?.toLocaleString() || 'N/A'}
@@ -234,12 +255,12 @@ Amount: TZS ${card.lastPaymentAmount?.toLocaleString() || 'N/A'}
               
               <div class="card-field">
                 <label>Join Date:</label>
-                <value>${new Date(card.joinDate).toLocaleDateString()}</value>
+                <value>${formatDate(card.joinDate)}</value>
               </div>
               
               <div class="card-field">
                 <label>Expiry Date:</label>
-                <value>${new Date(card.expiryDate).toLocaleDateString()}</value>
+                <value>${formatDate(card.expiryDate)}</value>
               </div>
               
               <div class="card-field">
@@ -284,8 +305,8 @@ Amount: TZS ${card.lastPaymentAmount?.toLocaleString() || 'N/A'}
           c.userName,
           c.userEmail,
           c.membershipType,
-          new Date(c.joinDate).toLocaleDateString(),
-          new Date(c.expiryDate).toLocaleDateString(),
+          formatDate(c.joinDate),
+          formatDate(c.expiryDate),
           c.paymentStatus,
           c.membershipStatus,
         ])
@@ -384,7 +405,7 @@ Amount: TZS ${card.lastPaymentAmount?.toLocaleString() || 'N/A'}
             </div>
             <div class="card-field">
               <label>Valid Until:</label>
-              <value>${new Date(card.expiryDate).toLocaleDateString()}</value>
+              <value>${formatDate(card.expiryDate)}</value>
             </div>
             <span class="status ${card.membershipStatus}">
               ${card.membershipStatus.toUpperCase()}
@@ -410,6 +431,25 @@ Amount: TZS ${card.lastPaymentAmount?.toLocaleString() || 'N/A'}
       setPrintInProgress(false);
     }
   };
+
+  const formatDate = (dateString: string | null | undefined) => {
+  if (!dateString || dateString === 'null' || dateString === '') return 'N/A';
+  
+  try {
+    const date = new Date(dateString);
+    // Check for invalid dates (like 1899 or invalid date strings)
+    if (isNaN(date.getTime()) || date.getFullYear() < 1900 || date.getFullYear() > 2100) {
+      return 'N/A';
+    }
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  } catch (error) {
+    return 'N/A';
+  }
+};
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -600,7 +640,7 @@ Amount: TZS ${card.lastPaymentAmount?.toLocaleString() || 'N/A'}
                       <span className="text-sm">{card.membershipType}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm">{new Date(card.expiryDate).toLocaleDateString()}</span>
+                      <span className="text-sm">{formatDate(card.expiryDate)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
@@ -664,7 +704,7 @@ Amount: TZS ${card.lastPaymentAmount?.toLocaleString() || 'N/A'}
             </div>
 
             <div className="p-6">
-              {/* Card Preview - using shared component */}
+              {/* Card Preview - using exact same component as user membership card */}
               <div className="mb-8 flex justify-center">
                 <MembershipCard
                   userName={selectedCard.userName}
@@ -686,11 +726,11 @@ Amount: TZS ${card.lastPaymentAmount?.toLocaleString() || 'N/A'}
                     </div>
                     <div>
                       <dt className="text-xs text-gray-500 uppercase">Join Date</dt>
-                      <dd className="text-sm font-medium text-gray-900">{new Date(selectedCard.joinDate).toLocaleDateString()}</dd>
+                      <dd className="text-sm font-medium text-gray-900">{formatDate(selectedCard.joinDate)}</dd>
                     </div>
                     <div>
                       <dt className="text-xs text-gray-500 uppercase">Expiry Date</dt>
-                      <dd className="text-sm font-medium text-gray-900">{new Date(selectedCard.expiryDate).toLocaleDateString()}</dd>
+                      <dd className="text-sm font-medium text-gray-900">{formatDate(selectedCard.expiryDate)}</dd>
                     </div>
                   </dl>
                 </div>
@@ -718,7 +758,7 @@ Amount: TZS ${card.lastPaymentAmount?.toLocaleString() || 'N/A'}
                     {selectedCard.paymentDate && (
                       <div>
                         <dt className="text-xs text-gray-500 uppercase">Payment Date</dt>
-                        <dd className="text-sm font-medium text-gray-900">{new Date(selectedCard.paymentDate).toLocaleDateString()}</dd>
+                        <dd className="text-sm font-medium text-gray-900">{formatDate(selectedCard.paymentDate)}</dd>
                       </div>
                     )}
                   </dl>

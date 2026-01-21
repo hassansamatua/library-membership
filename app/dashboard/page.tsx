@@ -276,7 +276,20 @@ export default function DashboardPage() {
                     <div className="text-lg font-semibold text-gray-900">
                       {user?.membershipNumber || 'N/A'}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">Expiry: {membershipStatus.membership?.expiryDate || membershipStatus.cycle?.expiryDate}</div>
+                    <div className="text-xs text-gray-500 mt-1">Expiry: {membershipStatus.membership?.expiryDate ? 
+                    new Date(membershipStatus.membership.expiryDate).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    }) : 
+                    membershipStatus.cycle?.expiryDate ? 
+                    new Date(membershipStatus.cycle.expiryDate).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    }) : 
+                    'N/A'
+                  }</div>
                   </div>
                   <div className="bg-gray-50 rounded-md p-4">
                     <div className="text-xs text-gray-500">Plan</div>

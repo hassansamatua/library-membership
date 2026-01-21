@@ -78,29 +78,13 @@ export async function POST(request: Request) {
       const membershipNumber = `TLA${year}${Math.floor(10000 + Math.random() * 90000)}`;
       const currentYear = new Date().getFullYear();
       
-      // Determine the correct expiry year based on membership cycle
-      // Membership cycles ALWAYS run from February 1 to January 31
-      // Regardless of when payment is made, it covers the current cycle year
-      const today = new Date();
-      let expiryYear;
-      
-      if (today.getMonth() === 0 && today.getDate() === 31) { // January 31
-        // Last day of current cycle, payment covers current cycle
-        expiryYear = today.getFullYear();
-      } else if (today.getMonth() === 0) { // January 1-30
-        // Still in January, payment covers current cycle
-        expiryYear = today.getFullYear();
-      } else if (today.getMonth() >= 1) { // February or later
-        // Current cycle is active, payment covers current cycle
-        expiryYear = today.getFullYear() + 1;
-      } else {
-        // Should not happen, but fallback
-        expiryYear = today.getFullYear() + 1;
-      }
+      // Calculate expiry year based on membership cycle (Feb 1 - Jan 31)
+      const now = new Date();
+      const expiryYear = now.getFullYear();
       
       console.log(' Membership cycle calculation:', {
-        today: today.toISOString(),
-        currentMonth: today.getMonth(),
+        today: now.toISOString(),
+        currentMonth: now.getMonth(),
         currentYear,
         expiryYear,
         expiryDate: `${expiryYear}-01-31`

@@ -1125,7 +1125,14 @@ export default function MembershipCardPage() {
                   <div className="flex justify-between">
                     <dt className="text-gray-600">Valid Until:</dt>
                     <dd className="font-medium">
-                      {new Date(membershipStatus?.membership?.expiryDate || '').toLocaleDateString()}
+                      {membershipStatus?.membership?.expiryDate ? 
+                        new Date(membershipStatus.membership.expiryDate).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        }) : 
+                        'N/A'
+                      }
                     </dd>
                   </div>
                 </dl>

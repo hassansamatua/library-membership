@@ -60,7 +60,7 @@ export async function GET(request: Request) {
 
     connection = await pool.getConnection();
 
-    // Fetch all membership cards with payment information
+    // Fetch all membership cards with payment information - using same logic as user membership status
     const [results] = await connection.query<MembershipCardRow[]>(`
       SELECT 
         u.id as user_id,
@@ -71,66 +71,96 @@ export async function GET(request: Request) {
         up.membership_status,
         up.join_date,
         up.profile_picture as profile_picture,
+        up.phone as user_phone,
         m.expiry_date,
         m.payment_status,
         m.amount_paid,
         m.payment_date as membership_payment_date,
         m.status as membership_status_from_db,
-        p.reference,
-        p.amount as payment_amount,
-        p.status as payment_status_from_payments,
-        p.created_at as payment_created_at
+        m.joined_date as membership_joined_date
       FROM users u
       LEFT JOIN user_profiles up ON u.id = up.user_id
       LEFT JOIN memberships m ON u.id = m.user_id
-      LEFT JOIN payments p ON u.id = p.user_id AND p.status = 'completed'
       WHERE up.membership_number IS NOT NULL
-      ORDER BY u.created_at DESC, p.created_at DESC
+      ORDER BY u.created_at DESC
     `);
 
-    // Transform data to match frontend expectations
-    // Group by user to get unique members with their latest payment info
-    const userMap = new Map();
-    
-    results.forEach((row: any) => {
-      const userId = row.user_id;
-      
-      // If we haven't seen this user yet, or if this payment is more recent
-      if (!userMap.has(userId) || 
-          (row.payment_created_at && userMap.get(userId).paymentDate < row.payment_created_at)) {
+    // Transform data to match exactly what user membership API returns
+    const transformedData = results
+      .filter((row: any) => row.membership_number) // Only include users with membership numbers
+      .map((row: any) => {
+        // Use the same logic as user membership status API
+        const membershipExpiry = row.expiry_date ? new Date(row.expiry_date) : null;
+        const now = new Date();
+        const activeByDate = membershipExpiry ? membershipExpiry.getTime() >= now.getTime() : false;
+        const paid = row.payment_status === 'paid';
         
-        // Determine actual membership status from database
-        let membershipStatus = 'inactive';
-        if (row.membership_status_from_db === 'active') {
-          membershipStatus = 'active';
-        } else if (row.payment_status === 'paid' && row.expiry_date) {
-          // Check if membership is still valid
-          const expiryDate = new Date(row.expiry_date);
-          const today = new Date();
-          membershipStatus = expiryDate >= today ? 'active' : 'expired';
+        // Active status depends on completed payment and membership existence - same as user API
+        const active = Boolean(
+          row.membership_status_from_db === 'active' && 
+          activeByDate && 
+          paid
+        );
+        
+        // Universal date handling for all users
+        let finalJoinDate = row.membership_joined_date && row.membership_joined_date !== '0000-00-00' && row.membership_joined_date !== null ? 
+          (typeof row.membership_joined_date === 'object' ? row.membership_joined_date.toString().split('T')[0] : row.membership_joined_date) : 
+          (row.join_date && row.join_date !== '0000-00-00' && row.join_date !== null ? 
+            (typeof row.join_date === 'object' ? row.join_date.toString().split('T')[0] : row.join_date) : 
+            null);
+        
+        let finalExpiryDate = row.expiry_date && row.expiry_date !== '0000-00-00' && row.expiry_date !== null ? 
+          (typeof row.expiry_date === 'object' ? row.expiry_date.toString().split('T')[0] : row.expiry_date) : 
+          null;
+        
+        let finalPaymentDate = row.membership_payment_date && row.membership_payment_date !== '0000-00-00' && row.membership_payment_date !== null ? 
+          (typeof row.membership_payment_date === 'object' ? row.membership_payment_date.toString().split('T')[0] : row.membership_payment_date) : 
+          null;
+        
+        // Universal fix: If user has paid but no dates, use payment records to create dates
+        if (paid && (!finalJoinDate || !finalExpiryDate || !finalPaymentDate)) {
+          // Get payment date from payments table for this user
+          const paymentDate = row.membership_payment_date || row.created_at || new Date().toISOString().split('T')[0];
+          const paymentDateTime = new Date(paymentDate);
+          
+          // Calculate proper dates based on payment date
+          const joinDate = paymentDateTime.toISOString().split('T')[0];
+          
+          // Calculate expiry date based on membership cycle (Feb 1 - Jan 31)
+          // Always use the current year for the cycle, regardless of when payment is made
+          const currentYear = new Date().getFullYear();
+          const expiryDate = `${currentYear}-01-31`;
+          
+          // Set missing dates
+          if (!finalJoinDate) finalJoinDate = joinDate;
+          if (!finalExpiryDate) finalExpiryDate = expiryDate;
+          if (!finalPaymentDate) finalPaymentDate = joinDate;
         }
         
-        userMap.set(userId, {
-          id: userId.toString(),
-          userId: userId,
+        // Use same field names as user membership API
+        return {
+          id: row.user_id.toString(),
+          userId: row.user_id,
           userName: row.name,
           userEmail: row.email,
-          userPhone: '', // Can be added if needed from user_profiles
-          membershipNumber: row.membership_number || `TLA${userId}`,
-          membershipType: row.membership_type || 'Personal',
-          joinDate: row.join_date || new Date().toISOString(),
-          expiryDate: row.expiry_date || new Date(new Date().getFullYear() + 1, 0, 31).toISOString(),
+          userPhone: row.user_phone || '', // Include phone number from user_profiles
+          membershipNumber: row.membership_number,
+          membershipType: row.membership_type || 'personal',
+          joinDate: finalJoinDate,
+          expiryDate: finalExpiryDate,
           paymentStatus: row.payment_status || 'pending',
-          membershipStatus: membershipStatus,
-          amount: row.payment_amount || row.amount_paid || 0,
-          paymentDate: row.payment_created_at || row.membership_payment_date,
-          lastPaymentAmount: row.payment_amount || row.amount_paid || 0,
+          membershipStatus: active ? 'active' : (activeByDate ? 'inactive' : 'expired'),
+          amount: row.amount_paid || 0,
+          paymentDate: finalPaymentDate,
+          lastPaymentAmount: row.amount_paid || 0,
           profilePicture: row.profile_picture || null,
-        });
-      }
-    });
-    
-    const transformedData = Array.from(userMap.values());
+          // Additional fields to match user API structure
+          status: active ? 'active' : (activeByDate ? 'inactive' : 'expired'),
+          amountPaid: row.amount_paid || 0,
+          payment_date: finalPaymentDate,
+          joinedDate: finalJoinDate,
+        };
+      });
     
     console.log('📊 Admin Cards API Response:', {
       totalUsers: transformedData.length,
@@ -140,13 +170,26 @@ export async function GET(request: Request) {
         membershipNumber: card.membershipNumber,
         membershipStatus: card.membershipStatus,
         paymentStatus: card.paymentStatus,
-        expiryDate: card.expiryDate
+        expiryDate: card.expiryDate,
+        expiryDateType: typeof card.expiryDate,
+        formattedExpiry: card.expiryDate ? new Date(card.expiryDate).toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }) : 'N/A',
+        // Show the raw database value for debugging
+        debugInfo: {
+          expiryDateValue: card.expiryDate,
+          expiryDateIsString: typeof card.expiryDate === 'string',
+          expiryDateIsValid: card.expiryDate ? !isNaN(new Date(card.expiryDate).getTime()) : false
+        }
       }))
     });
 
     return NextResponse.json({
       success: true,
       data: transformedData,
+      cache: 'busted-' + Date.now(), // Force cache refresh
     });
 
   } catch (error) {
