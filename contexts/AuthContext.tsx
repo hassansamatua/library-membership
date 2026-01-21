@@ -154,6 +154,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Update the user state
       setUser(userData);
 
+      // Add a small delay to ensure state is updated before returning
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       try {
         const meRes = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
         if (meRes.ok) {
@@ -295,6 +298,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
 
           console.log('[AuthContext] Auth check response status:', response.status);
+          console.log('[AuthContext] Auth check response headers:', response.headers);
 
           if (response.ok) {
             const userData = await response.json();

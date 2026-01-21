@@ -98,6 +98,8 @@ export default function PaymentSuccessPage() {
         console.error('Failed to activate test membership:', data.error || 'Unknown error');
         console.error('Response status:', response.status);
         console.error('Response data:', data);
+        console.error('Response data type:', typeof data);
+        console.error('Response data keys:', data ? Object.keys(data) : 'null');
         
         // Try to get more details from the response text if JSON parsing failed
         if (response.status >= 400) {

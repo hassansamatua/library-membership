@@ -86,7 +86,7 @@ export async function GET(request: Request) {
     // Get news with sender information and read status
     const [news] = await connection.query<RowDataPacket[]>(
       `SELECT n.*, u.name as sender_name,
-              CASE WHEN unr.user_id IS NOT NULL THEN 1 ELSE 0 END as is_read
+              CASE WHEN unr.user_id IS NOT NULL THEN true ELSE false END as is_read
        FROM news_notifications n
        LEFT JOIN users u ON n.sender_id = u.id
        LEFT JOIN user_notification_reads unr ON n.id = unr.notification_id AND unr.user_id = ?
@@ -147,12 +147,18 @@ export async function GET(request: Request) {
 
 // POST - Mark notification as read
 export async function POST(request: Request) {
+  console.log('🚀 POST /api/news - Starting request processing');
+  
   const connection = await pool.getConnection();
 
   try {
+    console.log('🔍 POST /api/news called');
+    
     const token = await getAuthToken(request);
+    console.log('🔍 Token found:', !!token);
 
     if (!token) {
+      console.log('❌ No token found');
       return NextResponse.json(
         { success: false, message: 'Authentication required' },
         { status: 401 }
@@ -160,29 +166,78 @@ export async function POST(request: Request) {
     }
 
     const decoded = verifyToken(token);
+    console.log('🔍 Token decoded:', { id: decoded?.id, isAdmin: decoded?.isAdmin });
+    
     if (!decoded?.id) {
+      console.log('❌ Invalid token');
       return NextResponse.json(
         { success: false, message: 'Invalid or expired token' },
         { status: 401 }
       );
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+      console.log('🔍 Request body parsed successfully');
+    } catch (parseError) {
+      console.error('❌ Failed to parse request body:', parseError);
+      return NextResponse.json(
+        { success: false, message: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
+    
     const { notificationId } = body;
+    console.log('🔍 Request body:', { notificationId });
 
     if (!notificationId) {
+      console.log('❌ No notificationId provided');
       return NextResponse.json(
         { success: false, message: 'Notification ID is required' },
         { status: 400 }
       );
     }
 
-    // Mark as read (insert or ignore if already read)
-    await connection.query(
-      `INSERT IGNORE INTO user_notification_reads (user_id, notification_id, read_at)
+    console.log('🔍 Attempting to mark notification', notificationId, 'as read for user', decoded.id);
+
+    // First check if notification exists and user has access
+    const [notificationCheck] = await connection.query(
+      `SELECT id FROM news_notifications WHERE id = ? AND is_active = 1 AND (expires_at IS NULL OR expires_at > NOW())`,
+      [notificationId]
+    );
+
+    if (!notificationCheck || (Array.isArray(notificationCheck) && notificationCheck.length === 0)) {
+      console.log('❌ Notification not found or expired:', notificationId);
+      return NextResponse.json(
+        { success: false, message: 'Notification not found or expired' },
+        { status: 404 }
+      );
+    }
+
+    // Check if already read
+    const [readCheck] = await connection.query(
+      `SELECT id FROM user_notification_reads WHERE user_id = ? AND notification_id = ?`,
+      [decoded.id, notificationId]
+    );
+
+    if (readCheck && Array.isArray(readCheck) && readCheck.length > 0) {
+      console.log('ℹ️ Notification already marked as read');
+      return NextResponse.json({
+        success: true,
+        message: 'Notification already marked as read'
+      });
+    }
+
+    // Mark as read
+    const result = await connection.query(
+      `INSERT INTO user_notification_reads (user_id, notification_id, read_at)
        VALUES (?, ?, NOW())`,
       [decoded.id, notificationId]
     );
+    
+    console.log('🔍 Insert result:', result);
+    console.log('✅ Successfully completed POST /api/news');
 
     return NextResponse.json({
       success: true,
@@ -190,16 +245,29 @@ export async function POST(request: Request) {
     });
 
   } catch (error: any) {
-    console.error('Error in POST /api/news:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' && { error: error.message })
-      },
-      { status: 500 }
-    );
+    console.error('❌ Error in POST /api/news:', error);
+    console.error('❌ Error stack:', error.stack);
+    
+    // Ensure we always return a proper JSON response
+    try {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: 'Internal server error: ' + (error?.message || 'Unknown error'),
+          ...(process.env.NODE_ENV === 'development' && { 
+            error: error?.message || 'Unknown error',
+            stack: error?.stack 
+          })
+        },
+        { status: 500 }
+      );
+    } catch (jsonError) {
+      console.error('❌ Failed to create JSON response:', jsonError);
+      return new Response('Internal Server Error', { status: 500 });
+    }
   } finally {
-    connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 }

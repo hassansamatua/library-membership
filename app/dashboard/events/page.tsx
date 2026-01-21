@@ -203,7 +203,7 @@ export default function EventsPage() {
                         {event.current_attendees} / {event.capacity} attendees
                       </div>
                       <div className="ml-4 px-2 py-1 bg-gray-100 rounded-md text-sm font-medium text-gray-700">
-                        {event.is_free ? 'Free' : `TZS ${event.price?.toLocaleString() || '0'}`}
+                        {event.is_free ? 'Free' : `TZS ${event.price?.toLocaleString()}`}
                       </div>
                     </div>
                   </div>
@@ -211,7 +211,7 @@ export default function EventsPage() {
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-lg font-bold text-gray-900">
-                        {event.is_free ? 'Free Event' : `TZS ${event.price?.toLocaleString() || '0'}`}
+                        {event.is_free ? 'Free Event' : `TZS ${event.price?.toLocaleString()}`}
                       </span>
                       <div className="flex space-x-2">
                         <button
@@ -331,7 +331,7 @@ export default function EventsPage() {
                     <div>
                       <h4 className="font-semibold text-gray-900 mb-1">Fee</h4>
                       <p className="text-gray-600">
-                        {selectedEvent.is_free ? 'Free' : `TZS ${selectedEvent.price?.toLocaleString() || '0'}`}
+                        {selectedEvent.is_free ? 'Free' : `TZS ${selectedEvent.price?.toLocaleString()}`}
                       </p>
                     </div>
                     <div>

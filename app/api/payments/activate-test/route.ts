@@ -78,63 +78,107 @@ export async function POST(request: Request) {
       const membershipNumber = `TLA${year}${Math.floor(10000 + Math.random() * 90000)}`;
       const currentYear = new Date().getFullYear();
       
-      // 3. First, create/update the membership_payments record
-      await connection.execute(
-        `INSERT INTO membership_payments 
-         (user_id, amount, payment_method, reference, 
-          payment_date, status, cycle_year, created_at, updated_at)
-         VALUES (?, ?, ?, ?, NOW(), 'completed', ?, NOW(), NOW())
-         ON DUPLICATE KEY UPDATE
-           status = 'completed',
-           payment_date = NOW(),
-           updated_at = NOW()`,
-        [
-          userId,
-          payment.amount || 40000,
-          payment.payment_method || 'test',
-          payment.reference,
-          currentYear
-        ]
-      );
+      // Determine the correct expiry year based on membership cycle
+      // Membership cycles ALWAYS run from February 1 to January 31
+      // Regardless of when payment is made, it covers the current cycle year
+      const today = new Date();
+      let expiryYear;
+      
+      if (today.getMonth() === 0 && today.getDate() === 31) { // January 31
+        // Last day of current cycle, payment covers current cycle
+        expiryYear = today.getFullYear();
+      } else if (today.getMonth() === 0) { // January 1-30
+        // Still in January, payment covers current cycle
+        expiryYear = today.getFullYear();
+      } else if (today.getMonth() >= 1) { // February or later
+        // Current cycle is active, payment covers current cycle
+        expiryYear = today.getFullYear() + 1;
+      } else {
+        // Should not happen, but fallback
+        expiryYear = today.getFullYear() + 1;
+      }
+      
+      console.log(' Membership cycle calculation:', {
+        today: today.toISOString(),
+        currentMonth: today.getMonth(),
+        currentYear,
+        expiryYear,
+        expiryDate: `${expiryYear}-01-31`
+      });
+      
+      // 3. First, create/update membership_payments record
+      try {
+        await connection.execute(
+          `INSERT INTO membership_payments 
+           (user_id, amount, payment_method, reference, 
+            payment_date, status, cycle_year, created_at, updated_at)
+           VALUES (?, ?, ?, ?, NOW(), 'completed', ?, NOW(), NOW())
+           ON DUPLICATE KEY UPDATE
+             status = 'completed',
+             payment_date = NOW(),
+             updated_at = NOW()`,
+          [
+            userId,
+            payment.amount || 40000,
+            payment.payment_method || 'test',
+            payment.reference,
+            currentYear
+          ]
+        );
+      } catch (error) {
+        await connection.rollback();
+        throw new Error(`Failed to create/update membership_payments record: ${error.message}`);
+      }
       
       // 4. Then, update the payments table to match the membership_payments status
-      await connection.execute(
-        `UPDATE payments p
-         INNER JOIN membership_payments mp ON p.reference = mp.reference
-         SET p.status = mp.status,
-             p.paid_at = mp.payment_date,
-             p.updated_at = NOW()
-         WHERE p.id = ? AND p.user_id = ?`,
-        [payment.id, userId]
-      );
+      try {
+        await connection.execute(
+          `UPDATE payments p
+           INNER JOIN membership_payments mp ON p.reference = mp.reference
+           SET p.status = mp.status,
+               p.paid_at = mp.payment_date,
+               p.updated_at = NOW()
+           WHERE p.id = ? AND p.user_id = ?`,
+          [payment.id, userId]
+        );
+      } catch (error) {
+        await connection.rollback();
+        throw new Error(`Failed to update payments table: ${error.message}`);
+      }
       
       // 5. Finally, create or update the membership record
-      await connection.execute(
-        `INSERT INTO memberships 
-         (user_id, membership_number, membership_type, status, 
-          payment_status, payment_date, reference, payment_method,
-          expiry_date, amount_paid, created_at, updated_at)
-         VALUES (?, ?, ?, 'active', 'paid', NOW(), ?, ?, 
-                DATE_ADD(NOW(), INTERVAL 1 YEAR), ?, NOW(), NOW())
-         ON DUPLICATE KEY UPDATE
-           status = 'active',
-           membership_type = VALUES(membership_type),
-           payment_status = 'paid',
-           payment_date = NOW(),
-           reference = VALUES(reference),
-           payment_method = VALUES(payment_method),
-           expiry_date = VALUES(expiry_date),
-           amount_paid = VALUES(amount_paid),
-           updated_at = NOW()`,
-        [
-          userId, 
-          membershipNumber,
-          payment.membership_type || 'personal',
-          payment.reference,
-          payment.payment_method || 'test',
-          payment.amount || 40000
-        ]
-      );
+      try {
+        await connection.execute(
+          `INSERT INTO memberships 
+           (user_id, membership_number, membership_type, status, 
+            payment_status, payment_date, reference, payment_method,
+            expiry_date, amount_paid, created_at, updated_at)
+           VALUES (?, ?, ?, 'active', 'paid', NOW(), ?, ?, 
+                  DATE(CONCAT(?, '-01-31')), ?, NOW(), NOW())
+           ON DUPLICATE KEY UPDATE
+             status = 'active',
+             membership_type = VALUES(membership_type),
+             payment_status = 'paid',
+             payment_date = NOW(),
+             reference = VALUES(reference),
+             payment_method = VALUES(payment_method),
+             expiry_date = VALUES(expiry_date),
+             amount_paid = VALUES(amount_paid),
+             updated_at = NOW()`,
+          [
+            userId, 
+            membershipNumber,
+            payment.membership_type || 'personal',
+            payment.reference,
+            payment.payment_method || 'test',
+            payment.amount || 40000,
+            expiryYear
+          ]
+        );
+      } catch (error) {
+        await connection.rollback();
+        throw new Error(`Failed to create/update membership record: ${error.message}`);
+      }
       
       // Commit the transaction
       await connection.commit();

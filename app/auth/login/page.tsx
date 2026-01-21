@@ -51,17 +51,19 @@ function LoginContent() {
       // Show success message
       toast.success("Login successful! Redirecting...");
 
-      // Use a small timeout to ensure the toast is visible
+      // Use a small timeout to ensure toast is visible
       setTimeout(() => {
+        console.log('[Login] About to redirect, user data:', userData);
+        console.log('[Login] User isAdmin:', userData.isAdmin);
         if (userData.isAdmin) {
           console.log('[Login] Admin user detected, redirecting to /admin');
           // For admin, use window.location to ensure full page load
           window.location.href = '/admin';
         } else {
           console.log(`[Login] Regular user, redirecting to: ${redirect}`);
-          // For regular users, use client-side navigation
-          router.replace(redirect);
-          router.refresh();
+          // For regular users, use window.location to ensure full page load and state refresh
+          console.log('[Login] Current window.location:', window.location.href);
+          window.location.href = redirect;
         }
       }, 1000);
 

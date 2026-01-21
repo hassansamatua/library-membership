@@ -72,13 +72,18 @@ export default function NewsPage() {
 
   const markAsRead = async (newsId: number) => {
     try {
+      console.log('🔍 Marking as read:', newsId);
       const response = await fetch('/api/news', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ notificationId: newsId }),
       });
+
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
 
       if (response.ok) {
         // Update local state
@@ -88,9 +93,18 @@ export default function NewsPage() {
         
         // Update the global unread count
         await refreshUnreadCount();
+        console.log('✅ Successfully marked as read');
+      } else {
+        try {
+          const errorData = await response.json();
+          console.error('❌ Error response:', errorData);
+        } catch (jsonError) {
+          console.error('❌ Failed to parse error response:', jsonError);
+          console.error('❌ Raw response:', await response.text());
+        }
       }
     } catch (error) {
-      console.error('Error marking as read:', error);
+      console.error('❌ Error marking as read:', error);
     }
   };
 
@@ -201,9 +215,9 @@ export default function NewsPage() {
               <p className="text-gray-500">Check back later for updates and announcements</p>
             </div>
           ) : (
-            news.map((newsItem) => (
+            news.map((newsItem, index) => (
               <div
-                key={newsItem.id}
+                key={`${newsItem.id}-${newsItem.sentAt}-${index}`}
                 className={`bg-white rounded-lg shadow border-l-4 ${getPriorityColor(newsItem.priority)} ${
                   !newsItem.is_read ? 'ring-2 ring-blue-500 ring-opacity-50' : ''
                 }`}

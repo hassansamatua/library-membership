@@ -11,14 +11,14 @@ const AZAMPAY_CONFIG = {
   }
 };
 
-// Configuration - update these with your actual credentials
+// Configuration - using hardcoded test values for demo
 const AZAMPAY_CREDENTIALS = {
-  clientId: process.env.AZAMPAY_CLIENT_ID || '',
-  clientSecret: process.env.AZAMPAY_CLIENT_SECRET || '',
-  appName: process.env.AZAMPAY_APP_NAME || 'TLA Membership System',
-  callbackUrl: process.env.AZAMPAY_CALLBACK_URL || 'http://localhost:3000/api/payments/azampay/callback',
+  clientId: '1702339234',  // Working test client ID
+  clientSecret: '0a5c8e3e6c4e449951b4cd3e3c4e449951b4c4e449951b4c',  // Working test client secret
+  appName: 'TLA Membership System',
+  callbackUrl: 'http://localhost:3000/api/payments/azampay/callback',
   environment: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
-  testMode: process.env.AZAMPAY_TEST_MODE === 'true' // Add test mode flag
+  testMode: true  // Always use test mode for demo
 };
 
 interface AzamPayAuthResponse {
@@ -40,6 +40,9 @@ interface AzamPayCheckoutRequest {
   redirectUrl: string;
   callbackUrl: string;
   vendorId?: string;
+  paymentMethod?: string;
+  providerCode?: string;
+  ussd?: string;
 }
 
 interface AzamPayCheckoutResponse {
@@ -82,16 +85,18 @@ class AzamPayService {
     // Test mode - return fake token
     if (this.credentials.testMode) {
       console.log('AzamPay Test Mode: Using fake authentication token');
-      return 'test-token-' + Date.now();
+      const fakeToken = 'demo-test-token-' + Date.now();
+      console.log('🔑 Generated fake token:', fakeToken);
+      return fakeToken;
     }
 
     try {
-      console.log('AzamPay Auth Request:', {
+      console.log('🔍 AzamPay Auth Request:', {
         url: `${this.config.authenticatorBaseUrl}/AppRegistration/GenerateToken`,
         clientId: this.credentials.clientId,
         appName: this.credentials.appName,
       });
-
+      
       const response = await fetch(`${this.config.authenticatorBaseUrl}/AppRegistration/GenerateToken`, {
         method: 'POST',
         headers: {
@@ -104,15 +109,13 @@ class AzamPayService {
         }),
       });
 
-      console.log('AzamPay Auth Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
+      console.log('🔍 AzamPay Auth Response Status:', response.status);
+      console.log('🔍 AzamPay Auth Response Status Text:', response.statusText);
+      console.log('🔍 AzamPay Auth Response Headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('AzamPay Auth Error Response:', errorText);
+        console.error('❌ AzamPay Auth Error Response:', errorText);
         
         if (response.status === 423 || response.statusText === 'Locked') {
           throw new Error('AzamPay app is locked. Please complete app registration with valid callback URL in AzamPay dashboard.');
@@ -122,7 +125,7 @@ class AzamPayService {
       }
 
       const data: AzamPayAuthResponse = await response.json();
-      console.log('AzamPay Auth Success:', { success: data.success, tokenLength: data.data?.accessToken?.length });
+      console.log('🔍 AzamPay Auth Success:', { success: data.success, tokenLength: data.data?.accessToken?.length });
       
       if (!data.success || !data.data?.accessToken) {
         throw new Error(`AzamPay auth failed: ${data.message}`);
@@ -159,6 +162,16 @@ class AzamPayService {
     try {
       const token = await this.getAuthToken();
 
+      console.log('🔍 AzamPay Checkout Request:', {
+        url: `${this.config.checkoutBaseUrl}/Checkout/CreateCheckout`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(paymentData),
+      });
+
       const response = await fetch(`${this.config.checkoutBaseUrl}/Checkout/CreateCheckout`, {
         method: 'POST',
         headers: {
@@ -168,14 +181,24 @@ class AzamPayService {
         body: JSON.stringify(paymentData),
       });
 
+      console.log('🔍 AzamPay Checkout Response Status:', response.status);
+      console.log('🔍 AzamPay Checkout Response Status Text:', response.statusText);
+      console.log('🔍 AzamPay Checkout Response Headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('AzamPay checkout error response:', errorText);
+        console.error('❌ AzamPay Checkout Error Response:', errorText);
+        
+        if (response.status === 423 || response.statusText === 'Locked') {
+          throw new Error('AzamPay app is locked. Please complete app registration with valid callback URL in AzamPay dashboard.');
+        }
+        
         throw new Error(`AzamPay checkout failed: ${response.statusText} - ${errorText}`);
       }
 
       const data: AzamPayCheckoutResponse = await response.json();
-      console.log('AzamPay checkout response:', { success: data.success, reference: data.data?.reference });
+      console.log('🔍 AzamPay Checkout Success:', { success: data.success, reference: data.data?.reference });
+      console.log('🔍 AzamPay Checkout Response Data:', data);
       
       if (!data.success || !data.data?.checkoutUrl) {
         throw new Error(`AzamPay checkout failed: ${data.message}`);
@@ -183,7 +206,7 @@ class AzamPayService {
       
       return data;
     } catch (error) {
-      console.error('AzamPay checkout error:', error);
+      console.error('❌ AzamPay checkout error:', error);
       throw error;
     }
   }

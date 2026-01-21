@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'react-toastify';
+import MembershipCard from '@/components/MembershipCard';
 import {
   FiSearch,
   FiDownload,
@@ -22,6 +23,7 @@ interface MembershipCardData {
   userId: number;
   userName: string;
   userEmail: string;
+  userPhone: string;
   membershipNumber: string;
   membershipType: string;
   joinDate: string;
@@ -72,6 +74,20 @@ export default function AdminCardsPage() {
       const response = await fetch('/api/admin/cards', { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch membership cards');
       const data = await response.json();
+      
+      console.log('📋 Admin Cards Frontend Received:', {
+        success: data.success,
+        totalCards: data.data?.length || 0,
+        sampleCards: data.data?.slice(0, 2).map(card => ({
+          id: card.id,
+          userName: card.userName,
+          membershipNumber: card.membershipNumber,
+          membershipStatus: card.membershipStatus,
+          paymentStatus: card.paymentStatus,
+          expiryDate: card.expiryDate
+        }))
+      });
+      
       setCards(data.data || []);
     } catch (error) {
       console.error('Error fetching cards:', error);
@@ -648,107 +664,15 @@ Amount: TZS ${card.lastPaymentAmount?.toLocaleString() || 'N/A'}
             </div>
 
             <div className="p-6">
-              {/* Card Preview - SVG-based to match user's membership card exactly */}
+              {/* Card Preview - using shared component */}
               <div className="mb-8 flex justify-center">
-                <svg width="336" height="212" xmlns="http://www.w3.org/2000/svg" className="rounded-lg shadow-xl overflow-hidden" style={{ borderRadius: '16px', boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.3)' }}>
-                  {/* Background with gradient */}
-                  <defs>
-                    {/* Main gradient: TLA Green */}
-                    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" style={{ stopColor: '#15803d', stopOpacity: 1 }} />
-                      <stop offset="50%" style={{ stopColor: '#16a34a', stopOpacity: 1 }} />
-                      <stop offset="100%" style={{ stopColor: '#166534', stopOpacity: 1 }} />
-                    </linearGradient>
-                    
-                    {/* Profile picture gradient */}
-                    <linearGradient id="profileGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" style={{ stopColor: '#4ade80', stopOpacity: 1 }} />
-                      <stop offset="100%" style={{ stopColor: '#22c55e', stopOpacity: 1 }} />
-                    </linearGradient>
-
-                    {/* Green accent gradient */}
-                    <linearGradient id="greenAccent" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" style={{ stopColor: '#10b981', stopOpacity: 1 }} />
-                      <stop offset="100%" style={{ stopColor: '#059669', stopOpacity: 1 }} />
-                    </linearGradient>
-
-                    {/* Filters for blur effects */}
-                    <filter id="blur1">
-                      <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
-                    </filter>
-                    <filter id="blur2">
-                      <feGaussianBlur in="SourceGraphic" stdDeviation="3"/>
-                    </filter>
-                    <filter id="blur3">
-                      <feGaussianBlur in="SourceGraphic" stdDeviation="4"/>
-                    </filter>
-                  </defs>
-                  
-                  {/* Main background */}
-                  <rect width="336" height="212" fill="url(#bgGradient)" rx="12" ry="12"/>
-                  
-                  {/* Background pattern with blur */}
-                  <circle cx="276" cy="52" r="40" fill="white" opacity="0.15" filter="url(#blur1)"/>
-                  <circle cx="60" cy="160" r="30" fill="white" opacity="0.12" filter="url(#blur2)"/>
-                  <circle cx="168" cy="106" r="50" fill="white" opacity="0.08" filter="url(#blur3)"/>
-                  
-                  {/* Logo background - circular with white */}
-                  <circle cx="36" cy="28" r="20" fill="white" stroke="rgba(16, 185, 129, 0.3)" strokeWidth="2"/>
-                  {/* TLA Logo Text */}
-                  <text x="36" y="28" fontFamily="Arial, sans-serif" fontSize="16" fontWeight="bold" fill="#059669" textAnchor="middle" dominantBaseline="middle">TLA</text>
-                  <text x="36" y="38" fontFamily="Arial, sans-serif" fontSize="6" fill="#059669" textAnchor="middle" fontWeight="600">Logo</text>
-                  
-                  {/* Organization name */}
-                  <text x="168" y="32" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">Tanzania Library and</text>
-                  <text x="168" y="48" fontFamily="Arial" fontSize="12" fontWeight="900" fill="white" textAnchor="middle">Information Association</text>
-                  <text x="168" y="62" fontFamily="Arial" fontSize="10" fill="#10b981" textAnchor="middle" fontWeight="600">(TLA)</text>
-                  
-                  {/* Profile picture with proper fallback */}
-                  <g>
-                    {/* Profile background circle */}
-                    <circle cx="296" cy="32" r="20" fill="white" stroke="rgba(16, 185, 129, 0.4)" strokeWidth="2"/>
-                    {selectedCard.profilePicture ? (
-                      <>
-                        <clipPath id="profileClip">
-                          <circle cx="296" cy="32" r="19"/>
-                        </clipPath>
-                        <image
-                          href={selectedCard.profilePicture.startsWith('/uploads/') 
-                            ? selectedCard.profilePicture 
-                            : `/uploads/profile-pictures/${selectedCard.profilePicture?.split('/').pop()}`}
-                          x="276"
-                          y="12"
-                          width="40"
-                          height="40"
-                          clipPath="url(#profileClip)"
-                          preserveAspectRatio="xMidYMid slice"
-                        />
-                      </>
-                    ) : (
-                      <>
-                        {/* Profile initial fallback */}
-                        <circle cx="296" cy="32" r="19" fill="url(#greenAccent)"/>
-                        <text x="296" y="32" fontFamily="Arial" fontSize="18" fontWeight="bold" fill="white" textAnchor="middle" dominantBaseline="middle">{selectedCard.userName?.charAt(0)?.toUpperCase() || 'M'}</text>
-                      </>
-                    )}
-                  </g>
-                  
-                  {/* Member name section */}
-                  <text x="70" y="75" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="1">MEMBER NAME</text>
-                  <text x="70" y="92" fontFamily="Arial, sans-serif" fontSize="13" fontWeight="bold" fill="white">{selectedCard.userName?.substring(0, 20) || 'Member Name'}</text>
-                  
-                  {/* Membership number (similar to card number) */}
-                  <text x="70" y="120" fontFamily="Arial, sans-serif" fontSize="8" fill="#10b981" fontWeight="700" letterSpacing="0.5">MEMBERSHIP No</text>
-                  <text x="70" y="138" fontFamily="monospace" fontSize="14" fontWeight="bold" fill="white" letterSpacing="2">{(selectedCard.membershipNumber || 'N/A').substring(0, 16)}</text>
-                  
-                  {/* Membership type */}
-                  <text x="150" y="162" fontFamily="Arial, sans-serif" fontSize="7" fill="#10b981" fontWeight="700">TYPE</text>
-                  <text x="150" y="174" fontFamily="Arial, sans-serif" fontSize="11" fontWeight="bold" fill="white">{(selectedCard.membershipType || 'Personal').toUpperCase()}</text>
-                  
-                  {/* Bottom accent bar with green */}
-                  <rect y="192" width="336" height="20" fill="rgba(16, 185, 129, 0.15)"/>
-                  <text x="16" y="205" fontFamily="Arial, sans-serif" fontSize="8" fill="rgba(255, 255, 255, 0.7)">Authorized Membership Card • TLA</text>
-                </svg>
+                <MembershipCard
+                  userName={selectedCard.userName}
+                  membershipNumber={selectedCard.membershipNumber}
+                  membershipType={selectedCard.membershipType}
+                  profilePicture={selectedCard.profilePicture}
+                  userPhone={selectedCard.userPhone}
+                />
               </div>
 
               {/* Details */}
@@ -757,8 +681,8 @@ Amount: TZS ${card.lastPaymentAmount?.toLocaleString() || 'N/A'}
                   <h4 className="text-sm font-semibold text-gray-700 mb-4">Card Information</h4>
                   <dl className="space-y-3">
                     <div>
-                      <dt className="text-xs text-gray-500 uppercase">Email</dt>
-                      <dd className="text-sm font-medium text-gray-900">{selectedCard.userEmail}</dd>
+                      <dt className="text-xs text-gray-500 uppercase">Phone</dt>
+                      <dd className="text-sm font-medium text-gray-900">{selectedCard.userPhone || 'N/A'}</dd>
                     </div>
                     <div>
                       <dt className="text-xs text-gray-500 uppercase">Join Date</dt>

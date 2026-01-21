@@ -25,6 +25,8 @@ interface Event {
   description: string;
   date: string;
   time: string;
+  start_time: string;
+  end_time: string;
   location: string;
   maxAttendees: number;
   currentAttendees: number;
@@ -129,8 +131,8 @@ export default function AdminEventsPage() {
       date: eventDate || event.date || '',
       time: eventTime || event.time || '',
       location: event.location || '',
-      maxAttendees: event.maxAttendees || 50,
-      fee: event.fee || 0,
+      maxAttendees: parseInt(String(event.maxAttendees)) || 50,
+      fee: parseFloat(String(event.fee)) || 0,
       isFree: event.isFree || false
     });
     
@@ -325,7 +327,7 @@ export default function AdminEventsPage() {
                   </div>
                   <div className="flex items-center">
                     <FiClock className="mr-2 h-4 w-4" />
-                    {event.isFree ? 'Free' : `TZS ${(event.fee || 0).toLocaleString()}`}
+                    {event.isFree ? 'Free' : `TZS ${event.fee?.toLocaleString()}`}
                   </div>
                 </div>
                 
@@ -467,8 +469,8 @@ export default function AdminEventsPage() {
                     type="number"
                     required
                     min="1"
-                    value={formData.maxAttendees}
-                    onChange={(e) => setFormData({ ...formData, maxAttendees: parseInt(e.target.value) })}
+                    value={formData.maxAttendees || ''}
+                    onChange={(e) => setFormData({ ...formData, maxAttendees: parseInt(e.target.value) || 0 })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
                   />
                 </div>
@@ -483,8 +485,8 @@ export default function AdminEventsPage() {
                         type="radio"
                         className="form-radio h-4 w-4 text-green-600"
                         checked={formData.isFree}
-                        />
-                        onChange={() => setFormData({ ...formData, isFree: true, price: 0 })}
+                        onChange={() => setFormData({ ...formData, isFree: true, fee: 0 })}
+                      />
                       <span className="ml-2 text-gray-700">Free</span>
                     </label>
                     <label className="inline-flex items-center">

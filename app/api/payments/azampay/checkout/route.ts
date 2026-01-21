@@ -47,10 +47,20 @@ export async function POST(request: NextRequest) {
         orderId,
         paymentMethod, // Pass the selected mobile money provider
       });
-    } catch (checkoutError) {
+    } catch (checkoutError: any) {
       console.error('AzamPay checkout error:', checkoutError);
+      console.error('AzamPay checkout error details:', {
+        message: checkoutError?.message || 'Unknown error',
+        stack: checkoutError?.stack
+      });
       return NextResponse.json(
-        { error: 'Failed to create payment checkout' },
+        { 
+          error: checkoutError?.message || 'Failed to create payment checkout',
+          details: process.env.NODE_ENV === 'development' ? {
+            originalError: checkoutError?.message,
+            stack: checkoutError?.stack
+          } : undefined
+        },
         { status: 500 }
       );
     }

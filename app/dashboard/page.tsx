@@ -86,10 +86,14 @@ export default function DashboardPage() {
   const [isEventsLoading, setIsEventsLoading] = useState(true);
 
   useEffect(() => {
+    console.log('[Dashboard] Authentication check - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
     if (!isLoading && !isAuthenticated) {
+      console.log('[Dashboard] User not authenticated, redirecting to login');
       router.push('/auth/login');
+    } else if (!isLoading && isAuthenticated) {
+      console.log('[Dashboard] User authenticated, staying on dashboard');
     }
-  }, [isLoading, isAuthenticated]);
+  }, [isLoading, isAuthenticated, router]);
 
   useEffect(() => {
     if (user) {

@@ -7,6 +7,7 @@ interface PhoneNumberInputProps {
   paymentMethod: string;
   onPhoneNumberSubmit: (phoneNumber: string) => void;
   onCancel: () => void;
+  disabled?: boolean;
 }
 
 const mobileNetworkConfigs = {
@@ -51,7 +52,8 @@ const mobileNetworkConfigs = {
 export default function PhoneNumberInput({ 
   paymentMethod, 
   onPhoneNumberSubmit, 
-  onCancel 
+  onCancel, 
+  disabled = false 
 }: PhoneNumberInputProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [errors, setErrors] = useState<{ phone?: string }>({});
@@ -206,7 +208,7 @@ export default function PhoneNumberInput({
         
         <button
           onClick={handlePhoneSubmit}
-          disabled={isLoading || !phoneNumber}
+          disabled={isLoading || !phoneNumber || disabled}
           className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
           {isLoading ? (

@@ -68,17 +68,24 @@ export async function POST(req: Request) {
       name: 'token',
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false, // Set to false for localhost development
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 1 week
       path: '/',
- 
     });
     
-    // Log the cookie being set for debugging
-    console.log('Cookie set with domain:', process.env.NODE_ENV === 'production' ? '.yourdomain.com' : 'localhost');
+    // Log cookie being set for debugging
+    console.log('Cookie set successfully:', {
+      name: 'token',
+      value: token.substring(0, 20) + '...',
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+      path: '/'
+    });
 
-    console.log('Cookie set in response');
+    console.log('Login successful, returning response');
     return response;
   } catch (error) {
     console.error('Login error:', error);

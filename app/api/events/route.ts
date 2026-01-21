@@ -48,7 +48,14 @@ export async function GET(request: NextRequest) {
         [userId]
       );
 
-      return NextResponse.json({ events });
+      // Map database fields to frontend interface
+      const mappedEvents = events.map(event => ({
+        ...event,
+        price: event.fee || 0, // Map fee to price for frontend compatibility
+        is_free: event.fee === 0 || event.fee === null || event.fee === undefined
+      }));
+
+      return NextResponse.json({ events: mappedEvents });
     } finally {
       connection.release();
     }

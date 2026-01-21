@@ -60,6 +60,13 @@ const toBoolean = (value: unknown) => {
   return false;
 };
 
+// Helper function to generate membership number in TLA YY XXXXX format
+function generateMembershipNumber(): string {
+  const year = new Date().getFullYear().toString().slice(-2); // Last two digits of current year
+  const randomNumber = Math.floor(10000 + Math.random() * 90000).toString(); // 5-digit random number
+  return `TLA${year}${randomNumber}`;
+}
+
 // Helper function to get image dimensions
 async function getImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
   return new Promise((resolve) => {
@@ -75,15 +82,55 @@ async function getImageDimensions(file: File): Promise<{ width: number; height: 
 }
 
 const normalizeProfile = (row: any) => {
+  // Parse personal_info JSON if available
+  let personalInfoJson: any = {};
+  if (row.personal_info) {
+    try {
+      personalInfoJson = JSON.parse(row.personal_info);
+    } catch (e) {
+      console.error('Error parsing personal_info JSON:', e);
+    }
+  }
+
+  // Parse employment JSON if available
+  let employmentJson: any = {};
+  if (row.employment) {
+    try {
+      employmentJson = JSON.parse(row.employment);
+    } catch (e) {
+      console.error('Error parsing employment JSON:', e);
+    }
+  }
+
+  // Parse education JSON if available
+  let educationJson: any[] = [];
+  if (row.education) {
+    try {
+      educationJson = JSON.parse(row.education);
+    } catch (e) {
+      console.error('Error parsing education JSON:', e);
+    }
+  }
+
+  // Parse membership_info JSON if available
+  let membershipInfoJson: any = {};
+  if (row.membership_info) {
+    try {
+      membershipInfoJson = JSON.parse(row.membership_info);
+    } catch (e) {
+      console.error('Error parsing membership_info JSON:', e);
+    }
+  }
+
   return {
     personalInfo: {
-      fullName: row.name || '',
-      dateOfBirth: row.date_of_birth || '',
-      gender: row.gender || '',
-      placeOfBirth: row.place_of_birth || '',
+      fullName: personalInfoJson.fullName || row.name || '',
+      dateOfBirth: personalInfoJson.date_of_birth || personalInfoJson.dateOfBirth || row.date_of_birth || '',
+      gender: personalInfoJson.gender || row.gender || '',
+      placeOfBirth: personalInfoJson.place_of_birth || personalInfoJson.placeOfBirth || row.place_of_birth || '',
       profilePicture: row.profile_picture || null,
-      nationality: row.nationality || '',
-      idNumber: row.id_number || ''
+      nationality: personalInfoJson.nationality || row.nationality || '',
+      idNumber: personalInfoJson.id_number || personalInfoJson.idNumber || row.id_number || ''
     },
     contactInfo: {
       email: row.email || '',
@@ -94,20 +141,20 @@ const normalizeProfile = (row: any) => {
       postalCode: row.postal_code || ''
     },
     professionalInfo: {
-      occupation: row.job_title || row.current_position || '',
-      company: row.employer_organization || row.industry || '',
-      yearsOfExperience: String(row.years_experience || row.years_of_experience || ''),
-      specialization: row.specialization || '',
-      skills: row.skills
+      occupation: employmentJson.occupation || row.job_title || row.current_position || '',
+      company: employmentJson.company || row.employer_organization || row.industry || '',
+      yearsOfExperience: employmentJson.yearsOfExperience || String(row.years_experience || row.years_of_experience || ''),
+      specialization: employmentJson.specialization || row.specialization || '',
+      skills: employmentJson.skills || (row.skills
         ? String(row.skills).split(',').map((s: string) => s.trim()).filter(Boolean)
-        : []
+        : [])
     },
-    education: [],
+    education: Array.isArray(educationJson) && educationJson.length > 0 ? educationJson : [],
     membership: {
-      membershipType: row.membership_type || '',
-      membershipNumber: row.membership_number || '',
-      membershipStatus: row.membership_status || '',
-      joinDate: row.join_date || ''
+      membershipType: membershipInfoJson.membership?.membershipType || row.membership_type || '',
+      membershipNumber: membershipInfoJson.membership?.membershipNumber || row.membership_number || '',
+      membershipStatus: membershipInfoJson.membership?.membershipStatus || row.membership_status || '',
+      joinDate: membershipInfoJson.membership?.joinDate || row.join_date || ''
     },
     payment: {
       paymentMethod: ''
@@ -181,9 +228,15 @@ async function updateProfileWithFormData(connection: PoolConnection, decodedId: 
 
   if (membership) {
     const membershipType = (membership as any).membershipType || (membership as any).membership_type || null;
-    const membershipNumber = (membership as any).membershipNumber || (membership as any).membership_number || null;
+    let membershipNumber = (membership as any).membershipNumber || (membership as any).membership_number || null;
     const membershipStatus = (membership as any).membershipStatus || (membership as any).membership_status || null;
     const joinDate = (membership as any).joinDate || (membership as any).join_date || null;
+    
+    // Generate membership number if not provided
+    if (!membershipNumber && membershipType) {
+      membershipNumber = generateMembershipNumber();
+    }
+    
     if (membershipType) profileUpdate.membership_type = membershipType;
     if (membershipNumber) profileUpdate.membership_number = membershipNumber;
     if (membershipStatus) profileUpdate.membership_status = membershipStatus;
@@ -470,13 +523,27 @@ export async function PUT(request: Request) {
 
     return await updateProfileWithFormData(connection, decoded.id, formData);
   } catch (error: unknown) {
-    console.error('Error in PUT /api/auth/profile:', error);
+    console.error('Error in updateProfileWithFormData:', error);
+    
+    // Log detailed error information
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+    
+    // Check if it's a database error
+    if (error && typeof error === 'object' && 'code' in error) {
+      console.error('Database error code:', (error as any).code);
+      console.error('Database error message:', (error as any).message);
+    }
+
     return NextResponse.json(
       { 
         success: false, 
         message: 'Internal server error',
         ...(process.env.NODE_ENV === 'development' && { 
-          error: error instanceof Error ? error.message : 'An unknown error occurred' 
+          error: error instanceof Error ? error.message : 'An unknown error occurred',
+          details: error
         })
       },
       { status: 500 }
