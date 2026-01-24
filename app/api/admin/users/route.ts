@@ -59,9 +59,12 @@ export async function GET(request: Request) {
              up.membership_number, up.membership_type, up.membership_status,
              up.membership_expiry, up.join_date, up.personal_info, up.contact_info,
              up.education, up.employment, up.membership_info,
-             up.professional_certifications, up.linkedin_profile
+             up.professional_certifications, up.linkedin_profile,
+             m.expiry_date, m.payment_status, m.amount_paid, m.payment_date,
+             m.status as membership_status_from_db, m.joined_date as membership_joined_date
       FROM users u
       LEFT JOIN user_profiles up ON u.id = up.user_id
+      LEFT JOIN memberships m ON u.id = m.user_id
     `;
     
     const params: any[] = [];
@@ -87,72 +90,164 @@ export async function GET(request: Request) {
     const [users] = await connection.query<RowDataPacket[]>(query, params);
     
     console.log('Users fetched:', users.length);
-    console.log('Approval status breakdown:');
-    users.forEach((user: any, index: number) => {
-      console.log(`  User ${index + 1}: ${user.name} - is_approved: ${user.is_approved}, is_admin: ${user.is_admin}`);
+    
+    // Transform the data to include profile information and calculate status
+    const transformedUsers = users.map(user => {
+      if (user.isAdmin) {
+        console.log(`👑 Admin User ${user.name}: Always active, no expiry calculation`);
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          isAdmin: user.isAdmin,
+          isApproved: user.isApproved,
+          status: 'active', // Admins are always active
+          createdAt: user.created_at,
+          updatedAt: user.updated_at,
+          profile: {
+            phone: user.phone,
+            address: user.address,
+            city: user.city,
+            state: user.state,
+            country: user.country,
+            postalCode: user.postal_code,
+            bio: user.bio,
+            profilePicture: user.profile_picture,
+            coverPhoto: user.cover_photo,
+            company: user.company,
+            jobTitle: user.job_title,
+            currentPosition: user.current_position,
+            industry: user.industry,
+            yearsOfExperience: user.years_of_experience,
+            skills: user.skills,
+            highestDegree: user.highest_degree,
+            fieldOfStudy: user.field_of_study,
+            institution: user.institution,
+            yearOfGraduation: user.year_of_graduation,
+            additionalCertifications: user.additional_certifications,
+            areasOfInterest: user.areas_of_interest,
+            idProofPath: user.id_proof_path,
+            degreeCertificatesPath: user.degree_certificates_path,
+            cvPath: user.cv_path,
+            website: user.website,
+            twitter: user.twitter,
+            linkedin: user.linkedin,
+            github: user.github,
+            facebook: user.facebook,
+            instagram: user.instagram,
+            dateOfBirth: user.date_of_birth,
+            gender: user.gender,
+            nationality: user.nationality,
+            idNumber: user.id_number,
+            passportNumber: user.passport_number,
+            membershipNumber: user.membership_number,
+            membershipType: user.membership_type,
+            membershipStatus: user.membership_status,
+            membershipExpiry: user.membership_expiry,
+            joinDate: user.join_date,
+            personalInfo: user.personal_info,
+            contactInfo: user.contact_info,
+            education: user.education,
+            employment: user.employment,
+            membershipInfo: user.membership_info,
+            professionalCertifications: user.professional_certifications,
+            linkedinProfile: user.linkedin_profile
+          }
+        };
+      }
+      
+      // Calculate membership status exactly like the cards API does (for non-admin users only)
+      const membershipExpiry = user.expiry_date ? new Date(user.expiry_date) : null;
+      const now = new Date();
+      const activeByDate = membershipExpiry ? membershipExpiry.getTime() >= now.getTime() : false;
+      const paid = user.payment_status === 'paid';
+      
+      // Active status depends on completed payment and membership existence - same as cards API
+      const active = Boolean(
+        user.membership_status_from_db === 'active' && 
+        activeByDate && 
+        paid
+      );
+      
+      // Calculate final status - same logic as cards API
+      const finalStatus = active ? 'active' : (activeByDate ? 'inactive' : 'expired');
+      
+      console.log(` User Status Calculation for ${user.name} (${user.isAdmin ? 'Admin' : 'User'}):`, {
+        membershipExpiry: user.expiry_date,
+        activeByDate,
+        paid,
+        membershipStatusFromDb: user.membership_status_from_db,
+        calculatedStatus: finalStatus
+      });
+      
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        isAdmin: user.isAdmin,
+        isApproved: user.isApproved,
+        status: finalStatus, // Use calculated status for non-admin users
+        createdAt: user.created_at,
+        updatedAt: user.updated_at,
+        profile: {
+          phone: user.phone,
+          address: user.address,
+          city: user.city,
+          state: user.state,
+          country: user.country,
+          postalCode: user.postal_code,
+          bio: user.bio,
+          profilePicture: user.profile_picture,
+          coverPhoto: user.cover_photo,
+          company: user.company,
+          jobTitle: user.job_title,
+          currentPosition: user.current_position,
+          industry: user.industry,
+          yearsOfExperience: user.years_of_experience,
+          skills: user.skills,
+          highestDegree: user.highest_degree,
+          fieldOfStudy: user.field_of_study,
+          institution: user.institution,
+          yearOfGraduation: user.year_of_graduation,
+          additionalCertifications: user.additional_certifications,
+          areasOfInterest: user.areas_of_interest,
+          idProofPath: user.id_proof_path,
+          degreeCertificatesPath: user.degree_certificates_path,
+          cvPath: user.cv_path,
+          website: user.website,
+          twitter: user.twitter,
+          linkedin: user.linkedin,
+          github: user.github,
+          facebook: user.facebook,
+          instagram: user.instagram,
+          dateOfBirth: user.date_of_birth,
+          gender: user.gender,
+          nationality: user.nationality,
+          idNumber: user.id_number,
+          passportNumber: user.passport_number,
+          membershipNumber: user.membership_number,
+          membershipType: user.membership_type,
+          membershipStatus: user.membership_status,
+          membershipExpiry: user.membership_expiry,
+          joinDate: user.join_date,
+          personalInfo: user.personal_info,
+          contactInfo: user.contact_info,
+          education: user.education,
+          employment: user.employment,
+          membershipInfo: user.membership_info,
+          professionalCertifications: user.professional_certifications,
+          linkedinProfile: user.linkedin_profile
+        }
+      };
     });
     
-    // Transform the data to include profile information
-    const transformedUsers = users.map(user => ({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      isAdmin: user.isAdmin,
-      isApproved: user.isApproved,
-      createdAt: user.created_at,
-      updatedAt: user.updated_at,
-      profile: {
-        phone: user.phone,
-        address: user.address,
-        city: user.city,
-        state: user.state,
-        country: user.country,
-        postalCode: user.postal_code,
-        bio: user.bio,
-        profilePicture: user.profile_picture,
-        coverPhoto: user.cover_photo,
-        company: user.company,
-        jobTitle: user.job_title,
-        currentPosition: user.current_position,
-        industry: user.industry,
-        yearsOfExperience: user.years_of_experience,
-        skills: user.skills,
-        highestDegree: user.highest_degree,
-        fieldOfStudy: user.field_of_study,
-        institution: user.institution,
-        yearOfGraduation: user.year_of_graduation,
-        additionalCertifications: user.additional_certifications,
-        areasOfInterest: user.areas_of_interest,
-        idProofPath: user.id_proof_path,
-        degreeCertificatesPath: user.degree_certificates_path,
-        cvPath: user.cv_path,
-        website: user.website,
-        twitter: user.twitter,
-        linkedin: user.linkedin,
-        github: user.github,
-        facebook: user.facebook,
-        instagram: user.instagram,
-        dateOfBirth: user.date_of_birth,
-        gender: user.gender,
-        nationality: user.nationality,
-        idNumber: user.id_number,
-        passportNumber: user.passport_number,
-        membershipNumber: user.membership_number,
-        membershipType: user.membership_type,
-        membershipStatus: user.membership_status,
-        membershipExpiry: user.membership_expiry,
-        joinDate: user.join_date,
-        personalInfo: user.personal_info,
-        contactInfo: user.contact_info,
-        education: user.education,
-        employment: user.employment,
-        membershipInfo: user.membership_info,
-        professionalCertifications: user.professional_certifications,
-        linkedinProfile: user.linkedin_profile
-      }
-    }));
-    
-    return NextResponse.json(transformedUsers);
+    return NextResponse.json(transformedUsers, {
+  headers: {
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+  }
+});
   } catch (error) {
     console.error('Error fetching users:', error);
     return NextResponse.json(

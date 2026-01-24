@@ -60,7 +60,7 @@ export async function GET(request: Request) {
 
     connection = await pool.getConnection();
 
-    // Fetch all membership cards with payment information - using same logic as user membership status
+    // Fetch all membership cards with payment information - exclude admin users
     const [results] = await connection.query<MembershipCardRow[]>(`
       SELECT 
         u.id as user_id,
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
       FROM users u
       LEFT JOIN user_profiles up ON u.id = up.user_id
       LEFT JOIN memberships m ON u.id = m.user_id
-      WHERE up.membership_number IS NOT NULL
+      WHERE up.membership_number IS NOT NULL AND u.is_admin = 0
       ORDER BY u.created_at DESC
     `);
 

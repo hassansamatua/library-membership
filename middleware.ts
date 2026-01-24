@@ -27,6 +27,7 @@ export async function middleware(request: NextRequest) {
       pathname === '/auth/login' || 
       pathname === '/auth/register' ||
       pathname === '/auth/forgot-password' ||
+      pathname === '/auth/reset-password' ||
       pathname === '/auth/pending-approval' ||
       pathname === '/terms' ||
       pathname === '/privacy') {

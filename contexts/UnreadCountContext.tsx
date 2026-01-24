@@ -8,6 +8,11 @@ interface UnreadCountContextType {
   refreshUnreadCount: () => Promise<void>;
 }
 
+interface NewsCountEvent {
+  type: 'increment' | 'decrement' | 'set';
+  count: number;
+}
+
 const UnreadCountContext = createContext<UnreadCountContextType | undefined>(undefined);
 
 export function UnreadCountProvider({ children }: { children: ReactNode }) {
@@ -28,9 +33,34 @@ export function UnreadCountProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Initial load
+  // Listen for real-time updates from news page
   useEffect(() => {
+    const handleNewsCountUpdate = (event: CustomEvent<NewsCountEvent>) => {
+      const { type, count } = event.detail;
+      
+      switch (type) {
+        case 'increment':
+          setUnreadCount(prev => prev + count);
+          break;
+        case 'decrement':
+          setUnreadCount(prev => Math.max(0, prev - count));
+          break;
+        case 'set':
+          setUnreadCount(count);
+          break;
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('newsCountUpdate', handleNewsCountUpdate as EventListener);
+
+    // Initial load
     refreshUnreadCount();
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('newsCountUpdate', handleNewsCountUpdate as EventListener);
+    };
   }, []);
 
   return (

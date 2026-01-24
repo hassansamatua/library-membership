@@ -54,9 +54,18 @@ export default function MemberManagementPage() {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/admin/users', { credentials: 'include' });
+      const response = await fetch(`/api/admin/users?t=${Date.now()}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch users');
       const data = await response.json();
+      console.log('📊 Users API Response:', {
+        totalUsers: data.length,
+        expiredUsers: data.filter((u: User) => u.status === 'expired').length,
+        sampleUsers: data.slice(0, 3).map((u: User) => ({
+          name: u.name,
+          email: u.email,
+          status: u.status
+        }))
+      });
       setUsers(data);
     } catch (error) {
       console.error('Error fetching users:', error);

@@ -40,6 +40,13 @@ export async function comparePasswords(plainPassword: string, hashedPassword: st
       const result = sha1Hash === hashedPassword;
       console.log('SHA-1 comparison result:', result);
       return result;
+    } else if (hashedPassword.length === 64 && !hashedPassword.includes('$')) {
+      // SHA-256 hash (from reset password API)
+      const crypto = require('crypto');
+      const sha256Hash = crypto.createHash('sha256').update(plainPassword).digest('hex');
+      const result = sha256Hash === hashedPassword;
+      console.log('SHA-256 comparison result:', result);
+      return result;
     } else {
       console.error('Unknown hash format:', hashedPassword.substring(0, 20));
       // Try bcrypt as fallback

@@ -4,7 +4,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { FiUser, FiCalendar, FiMail, FiPhone, FiMapPin, FiBriefcase, FiCheckCircle, FiAlertCircle, FiArrowRight, FiCreditCard } from "react-icons/fi";
+import { useUnreadCount } from "@/contexts/UnreadCountContext";
+import { FiUser, FiCalendar, FiMail, FiPhone, FiMapPin, FiBriefcase, FiCheckCircle, FiAlertCircle, FiArrowRight, FiCreditCard, FiBell } from "react-icons/fi";
 
 type MembershipStatusResponse = {
   success: boolean;
@@ -78,6 +79,7 @@ const calculateProfileCompletion = (user: any) => {
 
 export default function DashboardPage() {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { unreadCount } = useUnreadCount();
   const router = useRouter();
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [membershipStatus, setMembershipStatus] = useState<MembershipStatusResponse | null>(null);
@@ -185,7 +187,8 @@ export default function DashboardPage() {
       title: 'News', 
       description: 'View news and notifications from admin',
       icon: <FiMail className="h-6 w-6 text-blue-600" />,
-      action: () => router.push('/dashboard/news')
+      action: () => router.push('/dashboard/news'),
+      badge: unreadCount > 0 ? unreadCount : null
     },
   ];
 
@@ -372,8 +375,13 @@ export default function DashboardPage() {
                     <h3 className="text-lg font-medium text-gray-900">{action.title}</h3>
                     <p className="mt-1 text-sm text-gray-500">{action.description}</p>
                   </div>
-                  <div className="ml-5 shrink-0">
+                  <div className="ml-5 shrink-0 flex items-center">
                     <FiArrowRight className="h-5 w-5 text-gray-400" />
+                    {action.badge && (
+                      <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                        {action.badge}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

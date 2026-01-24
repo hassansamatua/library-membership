@@ -1,3 +1,6 @@
+// Load environment variables
+require('dotenv').config({ path: '.env.local' });
+
 // Simple email configuration without SSL verification
 export interface EmailConfig {
   host: string;
@@ -23,14 +26,19 @@ export const sendPasswordResetEmail = async (email: string, resetCode: string): 
     const transporter = nodemailer.createTransport({
       host: emailConfig.host,
       port: emailConfig.port,
-      secure: true,
+      secure: false, // Use false for port 587 (STARTTLS)
       auth: {
         user: emailConfig.username,
         pass: emailConfig.password
+      },
+      tls: {
+        rejectUnauthorized: false // Allow self-signed certificates
       }
     });
 
     const subject = 'Password Reset Code';
+    const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/reset-password?email=${encodeURIComponent(email)}`;
+    
     const message = `
       <html>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; background-color: #f4f4f4; margin: 0; padding: 20px;">
@@ -47,6 +55,13 @@ export const sendPasswordResetEmail = async (email: string, resetCode: string): 
                 <span style="font-size: 32px; font-weight: bold; color: #4CAF50; letter-spacing: 3px;">${resetCode}</span>
               </div>
               <p style="color: #666; font-size: 16px;">This code will expire in 15 minutes.</p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${resetUrl}" style="display: inline-block; background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                  Reset Password Now
+                </a>
+              </div>
+              <p style="color: #666; font-size: 16px;">Or copy and paste this link in your browser:</p>
+              <p style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; word-break: break-all; font-size: 14px; color: #333;">${resetUrl}</p>
               <p style="color: #666; font-size: 14px;">If you didn't request this, please ignore this email.</p>
               <div style="text-align: center; margin-top: 30px;">
                 <p style="color: #666; font-size: 14px;">Best regards,<br>The Team</p>

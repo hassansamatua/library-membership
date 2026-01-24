@@ -10,6 +10,7 @@ export default function ForgotPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [resetCode, setResetCode] = useState('');
+  const [showCodeEntry, setShowCodeEntry] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,7 +36,11 @@ export default function ForgotPasswordPage() {
       const data = await response.json();
       
       if (data.success) {
-        setMessage(`Password reset code has been sent to ${email}. Please check your email.`);
+        setMessage(`Password reset code has been sent to ${email}.`);
+        // Store email for potential redirect
+        localStorage.setItem('resetEmail', email);
+        // Show code entry form
+        setShowCodeEntry(true);
       } else {
         setMessage(data.message || 'Failed to send reset code');
       }
@@ -145,14 +150,55 @@ export default function ForgotPasswordPage() {
           </div>
         </form>
 
-        <div className="text-center mt-6">
+        <div className="text-center mt-6 space-y-4">
           <button
             onClick={() => router.push('/auth/login')}
             className="text-sm text-green-600 hover:text-green-700 font-medium"
           >
             Back to Login
           </button>
+          
+          {message.includes('sent') && (
+            <div className="text-sm text-gray-600">
+              <p>Once you receive the code, you can enter it below:</p>
+            </div>
+          )}
         </div>
+
+        {/* Code Entry Form */}
+        {showCodeEntry && (
+          <div className="mt-8 p-6 bg-white rounded-lg shadow-md border border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Enter Reset Code</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reset Code
+                </label>
+                <input
+                  type="text"
+                  value={resetCode}
+                  onChange={(e) => setResetCode(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Enter 6-digit code"
+                  maxLength={6}
+                />
+              </div>
+              
+              <button
+                onClick={() => {
+                  if (resetCode.length === 6) {
+                    router.push(`/auth/reset-password?email=${encodeURIComponent(email)}&code=${resetCode}`);
+                  } else {
+                    setMessage('Please enter a valid 6-digit code');
+                  }
+                }}
+                className="w-full px-4 py-2 text-sm text-white bg-green-600 hover:bg-green-700 rounded-md border border-transparent"
+              >
+                Submit Code & Reset Password
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -32,11 +32,24 @@ export async function POST(request: Request) {
 
     const user = users[0];
 
+    // Invalidate all existing reset codes for this user before generating new one
+    await connection.query(
+      'UPDATE users SET reset_token = NULL, reset_token_expires_at = NULL WHERE email = ?',
+      [email]
+    );
+
     // Generate a 6-digit reset code
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString().slice(-6);
 
-    // Store reset code and expiry (15 minutes from now)
-    const expiryTime = new Date(Date.now() + 15 * 60 * 1000).toISOString().slice(0, 19).replace('T', 'Z');
+    // Store reset code and expiry (30 minutes from now with proper timezone)
+    const now = new Date();
+    const thirtyMinutesLater = new Date(now.getTime() + 30 * 60 * 1000);
+    const expiryTime = thirtyMinutesLater.toISOString().slice(0, 19).replace('T', ' ');
+    
+    console.log('=== CODE GENERATION DEBUG ===');
+    console.log('Current time:', now.toISOString());
+    console.log('Expiry time:', expiryTime);
+    console.log('============================');
 
     await connection.query(
       'UPDATE users SET reset_token = ?, reset_token_expires_at = ? WHERE id = ?',
@@ -89,10 +102,10 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Find user by email
+    // Find user by email and reset token (simplified like verification API)
     const [users] = await connection.query<RowDataPacket[]>(
-      'SELECT id, name, email FROM users WHERE email = ?',
-      [email]
+      'SELECT id, name, email, reset_token, reset_token_expires_at FROM users WHERE email = ? AND reset_token = ? AND reset_token IS NOT NULL',
+      [email, resetCode]
     );
 
     if (!users || users.length === 0) {
@@ -103,26 +116,13 @@ export async function PUT(request: Request) {
     }
 
     const user = users[0];
-
-    // Check if reset code is valid and not expired
-    const [resetRecords] = await connection.query<RowDataPacket[]>(
-      'SELECT reset_token, reset_token_expires_at FROM users WHERE id = ?',
-      [user.id]
-    );
-
-    if (!resetRecords || resetRecords.length === 0) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid or expired reset code' },
-        { status: 400 }
-      );
-    }
-
-    const resetRecord = resetRecords[0];
+    
+    // Check if reset code is not expired (same logic as verification API)
     const currentTime = new Date();
-
-    // Check if code matches and is not expired
-    if (resetRecord.reset_token !== resetCode || 
-        new Date(resetRecord.reset_token_expires_at) < currentTime) {
+    const expiresAt = new Date(user.reset_token_expires_at + 'Z'); // Ensure UTC parsing
+    const isExpired = expiresAt < currentTime;
+    
+    if (isExpired) {
       return NextResponse.json(
         { success: false, message: 'Reset code has expired or is invalid' },
         { status: 400 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRealTimeContactCount } from '@/hooks/useRealTimeContactCount';
 import {
   FiHome,
   FiUsers,
@@ -19,6 +20,7 @@ import {
   FiCreditCard,
   FiFileText,
   FiAward,
+  FiMail,
 } from 'react-icons/fi';
 import { FiBell } from 'react-icons/fi';
 
@@ -29,6 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const { contactCount, refetchContactCount } = useRealTimeContactCount();
 
   // Handle hydration
   useEffect(() => {
@@ -67,6 +70,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Dashboard', href: '/admin', icon: FiHome },
     { name: 'Member Management', href: '/admin/users', icon: FiUsers },
     { name: 'Card Management', href: '/admin/cards', icon: FiCreditCard },
+    { name: 'Contact Submissions', href: '/admin/contact-submissions', icon: FiMail },
     { name: 'News', href: '/admin/news', icon: FiBell },
     { name: 'Content Management', href: '/admin/content', icon: FiFile },
     { name: 'Events', href: '/admin/events', icon: FiCalendar },
@@ -113,12 +117,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
+            const showBadge = item.name === 'Contact Submissions' && contactCount > 0;
             
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors duration-200 ${
+                className={`flex items-center justify-between px-4 py-3 text-sm font-medium rounded-md transition-colors duration-200 ${
                   isActive
                     ? 'bg-green-100 text-green-700 border-r-4 border-green-600'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -127,8 +132,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 target={item.external ? '_blank' : '_self'}
                 rel={item.external ? 'noopener noreferrer' : ''}
               >
-                <Icon className="mr-3 h-5 w-5" />
-                {item.label}
+                <div className="flex items-center">
+                  <Icon className="mr-3 h-5 w-5" />
+                  {item.label}
+                </div>
+                {showBadge && (
+                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center">
+                    {contactCount}
+                    <span className="ml-1 text-xs">Unread</span>
+                  </span>
+                )}
               </Link>
             );
           })}
