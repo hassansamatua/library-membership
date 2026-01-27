@@ -3,7 +3,27 @@ import { pool } from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
-import { sendRejectionNotification } from '@/lib/notificationService';
+import { sendEmail, emailTemplates } from '@/lib/email';
+
+// Helper function to send rejection email
+async function sendRejectionEmail(email: string, name: string, reason?: string) {
+  try {
+    const emailTemplate = emailTemplates.userRejected(name, reason);
+    const success = await sendEmail({
+      to: email,
+      subject: emailTemplate.subject,
+      html: emailTemplate.html,
+    });
+    
+    if (success) {
+      console.log('Rejection email sent successfully to:', email);
+    } else {
+      console.log('Failed to send rejection email to:', email);
+    }
+  } catch (emailError) {
+    console.error('Error sending rejection email:', emailError);
+  }
+}
 
 interface User extends RowDataPacket {
   id: number;
@@ -103,15 +123,11 @@ export async function POST(
 
       console.log('User rejected successfully:', userId);
 
-      // Send rejection notification using the notification service
+      // Send rejection email
       try {
-        console.log(`[REJECT] Attempting to send rejection notification to ${user.email}`);
-        const notificationSent = await sendRejectionNotification(
-          user.id,
-          user.name,
-          rejectionReason
-        );
-        console.log(`[REJECT] Notification send result:`, notificationSent);
+        console.log(`[REJECT] Attempting to send rejection email to ${user.email}`);
+        await sendRejectionEmail(user.email, user.name, rejectionReason);
+        console.log(`[REJECT] Rejection email sent successfully`);
       } catch (emailError) {
         console.error('[REJECT] Failed to send rejection email:', emailError);
         // Don't fail the request if email fails

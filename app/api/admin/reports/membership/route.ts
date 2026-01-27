@@ -100,6 +100,27 @@ export async function GET(request: Request) {
       ORDER BY month
     `);
 
+    // Get active members list
+    const [activeMembersList] = await connection.query<RowDataPacket[]>(`
+      SELECT 
+        u.id,
+        u.name,
+        u.email,
+        m.membership_number,
+        m.membership_type,
+        m.status,
+        m.expiry_date,
+        m.joined_date,
+        m.payment_status,
+        m.created_at as membership_created_at
+      FROM memberships m
+      LEFT JOIN users u ON m.user_id = u.id
+      WHERE m.status = 'active' 
+      AND m.expiry_date >= CURDATE()
+      ORDER BY m.created_at DESC
+      LIMIT 50
+    `);
+
     connection.release();
 
     return NextResponse.json({
@@ -110,7 +131,8 @@ export async function GET(request: Request) {
         typeTrends,
         demographics,
         activityLevels,
-        retentionData
+        retentionData,
+        activeMembersList
       }
     });
 

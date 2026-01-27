@@ -111,14 +111,29 @@ export async function GET(request: Request) {
     }
 
     // Verify token
-    const decoded = verifyToken(token);
-    console.log('[Auth/me] Token decoded:', decoded);
-    if (!decoded?.id) {
-      console.log('[Auth/me] Invalid token - no ID found');
-      return new NextResponse(
-        JSON.stringify({ message: 'Invalid or expired token' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
+    let decoded;
+    try {
+      decoded = verifyToken(token);
+      console.log('[Auth/me] Token decoded:', decoded);
+      if (!decoded?.id) {
+        console.log('[Auth/me] Invalid token - no ID found');
+        return new NextResponse(
+          JSON.stringify({ message: 'Invalid or expired token' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Token has expired') {
+        return new NextResponse(
+          JSON.stringify({ message: 'Token has expired' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      } else {
+        return new NextResponse(
+          JSON.stringify({ message: 'Invalid or expired token' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Get database connection

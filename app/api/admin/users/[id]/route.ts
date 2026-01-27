@@ -421,7 +421,8 @@ export async function DELETE(
   let connection: PoolConnection | null = null;
   
   try {
-    const { id } = params;
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
     const userId = parseInt(id, 10);
     
     if (isNaN(userId) || userId <= 0) {

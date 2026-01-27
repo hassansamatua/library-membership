@@ -65,6 +65,17 @@ export async function middleware(request: NextRequest) {
 
     if (!response.ok) {
       console.log(`[Middleware] Auth check failed with status: ${response.status}`);
+      
+      // If token expired, clear it and redirect to login
+      if (response.status === 401 || response.status === 500) {
+        console.log('[Middleware] Token expired or invalid, clearing and redirecting');
+        const loginUrl = new URL('/auth/login', request.url);
+        loginUrl.searchParams.set('redirect', pathname);
+        const redirectResponse = NextResponse.redirect(loginUrl);
+        redirectResponse.cookies.delete('token');
+        return redirectResponse;
+      }
+      
       throw new Error('Invalid token');
     }
 

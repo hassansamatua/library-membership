@@ -156,23 +156,33 @@ export async function GET(request: Request) {
         };
       }
       
-      // Calculate membership status exactly like the cards API does (for non-admin users only)
-      const membershipExpiry = user.expiry_date ? new Date(user.expiry_date) : null;
-      const now = new Date();
-      const activeByDate = membershipExpiry ? membershipExpiry.getTime() >= now.getTime() : false;
-      const paid = user.payment_status === 'paid';
+      // Calculate final status - prioritize approval status over membership status
+      let finalStatus: string;
+      let membershipExpiry, now, activeByDate, paid;
       
-      // Active status depends on completed payment and membership existence - same as cards API
-      const active = Boolean(
-        user.membership_status_from_db === 'active' && 
-        activeByDate && 
-        paid
-      );
-      
-      // Calculate final status - same logic as cards API
-      const finalStatus = active ? 'active' : (activeByDate ? 'inactive' : 'expired');
+      // First check if user is approved
+      if (!user.isApproved) {
+        finalStatus = 'pending';
+      } else {
+        // User is approved, now calculate membership status
+        membershipExpiry = user.expiry_date ? new Date(user.expiry_date) : null;
+        now = new Date();
+        activeByDate = membershipExpiry ? membershipExpiry.getTime() >= now.getTime() : false;
+        paid = user.payment_status === 'paid';
+        
+        // Active status depends on completed payment and membership existence - same as cards API
+        const active = Boolean(
+          user.membership_status_from_db === 'active' && 
+          activeByDate && 
+          paid
+        );
+        
+        // Calculate membership status only for approved users
+        finalStatus = active ? 'active' : (activeByDate ? 'inactive' : 'expired');
+      }
       
       console.log(` User Status Calculation for ${user.name} (${user.isAdmin ? 'Admin' : 'User'}):`, {
+        isApproved: user.isApproved,
         membershipExpiry: user.expiry_date,
         activeByDate,
         paid,

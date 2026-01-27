@@ -4,58 +4,25 @@ import { pool } from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
-import { Resend } from 'resend';
+import { sendEmail, emailTemplates } from '@/lib/email';
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-
-// Helper function to send email safely
+// Helper function to send approval email
 async function sendApprovalEmail(email: string, name: string, membershipNumber?: string) {
-  if (!resend) {
-    console.log('Resend API key not configured, skipping email sending');
-    return;
-  }
-  
   try {
-    await resend.emails.send({
-      from: 'TLA <onboarding@resend.dev>',
+    const emailTemplate = emailTemplates.userApproved(name, membershipNumber);
+    const success = await sendEmail({
       to: email,
-      subject: 'Your Account Has Been Approved!',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #111827; font-size: 24px; margin-bottom: 20px;">
-            Welcome, ${name}!
-          </h1>
-          <p style="color: #374151; line-height: 1.6; margin-bottom: 20px;">
-            Your account has been approved. You can now log in.
-          </p>
-          ${membershipNumber ? `
-          <div style="background-color: #F3F4F6; padding: 16px; border-radius: 8px; margin: 20px 0;">
-            <p style="margin: 0; font-weight: 500; color: #111827;">Membership Number:</p>
-            <p style="font-size: 24px; font-weight: 700; color: #10B981; margin: 8px 0 0 0;">${membershipNumber}</p>
-          </div>
-          ` : ''}
-          <div style="margin: 30px 0;">
-            <a 
-              href="${process.env.NEXT_PUBLIC_APP_URL}/auth/login" 
-              style="
-                display: inline-block; 
-                padding: 12px 24px; 
-                background-color: #10B981; 
-                color: white; 
-                text-decoration: none; 
-                border-radius: 6px;
-                font-weight: 500;
-                font-size: 16px;
-              "
-            >
-              Log In
-            </a>
-          </div>
-        </div>
-      `,
+      subject: emailTemplate.subject,
+      html: emailTemplate.html,
     });
+    
+    if (success) {
+      console.log('Approval email sent successfully to:', email);
+    } else {
+      console.log('Failed to send approval email to:', email);
+    }
   } catch (emailError) {
-    console.error('Failed to send approval email:', emailError);
+    console.error('Error sending approval email:', emailError);
   }
 }
 
@@ -164,9 +131,11 @@ async function handleApproveUser(request: Request, userId: string) {
       // Generate membership number if not exists
       let membershipNumber = user.membership_number;
       if (!membershipNumber || membershipNumber.trim() === '') {
-        const year = new Date().getFullYear(); // Full year (2026)
+        // Import getCycleYearForDate to get correct membership cycle year
+        const { getCycleYearForDate } = await import('@/lib/membershipCycles');
+        const cycleYear = getCycleYearForDate(new Date()); // Uses membership cycle year (2025 until Feb 1, 2026)
         const randomNum = Math.floor(10000 + Math.random() * 90000); // 5-digit random number
-        membershipNumber = `TLA${year}${randomNum}`;
+        membershipNumber = `TLA${cycleYear}${randomNum}`;
         
         console.log('Generated new membership number:', membershipNumber);
         

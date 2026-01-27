@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { getCycleYearForDate } from '@/lib/membershipCycles';
 import { cookies } from 'next/headers';
 import type { RowDataPacket } from 'mysql2/promise';
 
@@ -33,8 +34,8 @@ function toDateOnlyIso(date: Date) {
 function getCycleDates(now: Date) {
   const year = now.getFullYear();
   // Membership cycles ALWAYS run from February 1 to January 31
-  // Regardless of when payment is made, it covers the current cycle year
-  const cycleYear = year;
+  // Use membership cycle year calculation (Jan dates belong to previous cycle)
+  const cycleYear = getCycleYearForDate(now);
   const cycleStart = new Date(cycleYear, 1, 1); // February 1st
   const dueDate = new Date(cycleYear, 2, 31); // March 31st
   const expiryDate = new Date(cycleYear + 1, 0, 31); // January 31st next year

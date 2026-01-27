@@ -68,28 +68,107 @@ export default function PaymentSuccessPage() {
         return;
       }
 
+      // Test simple endpoint to isolate the issue
+      console.log('Testing simple endpoint...');
+      try {
+        const simpleResponse = await fetch('/api/test-simple', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ test: true }),
+          credentials: 'include',
+        });
+        
+        console.log('Simple response status:', simpleResponse.status);
+        console.log('Simple response ok:', simpleResponse.ok);
+        
+        const simpleData = await simpleResponse.json().catch(async (e) => {
+          console.error('Simple JSON parse failed:', e);
+          const text = await simpleResponse.text().catch(() => 'Failed to read simple response text');
+          console.error('Simple raw text:', text);
+          return { error: 'Simple JSON failed', rawText: text };
+        });
+        
+        console.log('Simple response data:', simpleData);
+      } catch (simpleError) {
+        console.error('Simple test failed:', simpleError);
+        console.error('Simple error type:', typeof simpleError);
+        console.error('Simple error message:', simpleError instanceof Error ? simpleError.message : 'Unknown error');
+      }
+
+      // Test echo endpoint first to isolate the issue
+      console.log('Testing echo endpoint...');
+      try {
+        const echoResponse = await fetch('/api/test-echo', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ reference: ref, test: true }),
+          credentials: 'include',
+        });
+        
+        const echoData = await echoResponse.json();
+        console.log('Echo response:', {
+          status: echoResponse.status,
+          ok: echoResponse.ok,
+          data: echoData
+        });
+      } catch (echoError) {
+        console.error('Echo test failed:', echoError);
+      }
+
       // Then activate the membership
       console.log('Activating test membership...');
-      const response = await fetch('/api/payments/activate-test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-        },
-        body: JSON.stringify({ reference: ref }),
-        credentials: 'include',
-      });
+      let response;
+      let data;
       
-      const data = await response.json().catch(e => {
-        console.error('Failed to parse JSON response:', e);
-        return { error: 'Invalid JSON response' };
-      });
+      try {
+        response = await fetch('/api/payments/activate-test', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
+          body: JSON.stringify({ reference: ref }),
+          credentials: 'include',
+        });
+        console.log('Fetch completed, response status:', response.status);
+      } catch (fetchError) {
+        console.error('Fetch failed completely:', fetchError);
+        console.error('Fetch error type:', typeof fetchError);
+        console.error('Fetch error message:', fetchError instanceof Error ? fetchError.message : 'Unknown error');
+        return;
+      }
+      
+      try {
+        data = await response.json().catch(async (e) => {
+          console.error('Failed to parse JSON response:', e);
+          // Try to get the raw response text to see what's actually being returned
+          const text = await response.text().catch(() => 'Could not read response text');
+          console.error('Raw response text:', text);
+          console.error('Response headers:', Object.fromEntries(response.headers.entries()));
+          return { error: 'Invalid JSON response', rawText: text };
+        });
+      } catch (jsonError) {
+        console.error('JSON parsing failed completely:', jsonError);
+        data = { error: 'JSON parsing failed', details: jsonError instanceof Error ? jsonError.message : 'Unknown error' };
+      }
       
       console.log('Activate test membership response:', {
         status: response.status,
         ok: response.ok,
         data: data
       });
+      
+      // Log the specific error details
+      if (data && data.error) {
+        console.error('API Error Details:');
+        console.error('- Error:', data.error);
+        console.error('- Details:', data.details);
+        console.error('- Success:', data.success);
+      }
       
       if (response.ok && data.success) {
         console.log('Test membership activated for reference:', ref);

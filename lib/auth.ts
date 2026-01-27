@@ -64,7 +64,7 @@ export function generateToken(user: any) {
   return jwt.sign(
     { id: user.id, email: user.email, isAdmin: user.is_admin },
     JWT_SECRET,
-    { expiresIn: '1d' }
+    { expiresIn: '7d' } // Extended from 1d to 7d
   );
 }
 
@@ -93,11 +93,22 @@ export function verifyToken(token: string) {
       const now = Math.floor(Date.now() / 1000);
       const expiresIn = decoded.exp - now;
       console.log(`Token expires in ${expiresIn} seconds`);
+      
+      if (expiresIn <= 0) {
+        console.log('Token has expired');
+        throw new Error('Token has expired');
+      }
     }
 
     return decoded;
   } catch (error) {
     console.error('Token verification failed:', error instanceof Error ? error.message : 'Unknown error');
+    
+    // Return specific error for expired tokens
+    if (error instanceof Error && error.message === 'Token has expired') {
+      throw new Error('Token has expired');
+    }
+    
     throw new Error('Invalid or expired token');
   }
 }

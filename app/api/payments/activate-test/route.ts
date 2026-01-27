@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { getCycleYearForDate } from '@/lib/membershipCycles';
 import { cookies } from 'next/headers';
+import type { RowDataPacket } from 'mysql2';
 
-interface PaymentRow {
+interface PaymentRow extends RowDataPacket {
   id: number;
   user_id: number;
   amount: number;
@@ -12,7 +14,7 @@ interface PaymentRow {
   reference: string;
 }
 
-async function getAuthToken(request: Request) {
+async function getAuthToken(request: Request): Promise<string | null> {
   const authHeader = request.headers.get('authorization');
   const authToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
   if (authToken) return authToken;
@@ -25,33 +27,45 @@ export async function POST(request: Request) {
   let connection;
   
   try {
+    console.log('[Activate-Test] Request received');
+    
     const { reference } = await request.json();
+    console.log('[Activate-Test] Reference extracted:', reference);
     
     if (!reference) {
+      console.log('[Activate-Test] No reference provided');
       return NextResponse.json({ error: 'Reference is required' }, { status: 400 });
     }
 
     // Get the authenticated user from the session
     const token = await getAuthToken(request);
+    console.log('[Activate-Test] Token retrieved:', !!token);
     
     if (!token) {
+      console.log('[Activate-Test] No token found');
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     // Verify the token and get user ID
     const decoded = verifyToken(token);
+    console.log('[Activate-Test] Token decoded:', decoded?.id);
     
     if (!decoded?.id) {
+      console.log('[Activate-Test] Invalid token - no ID');
       return NextResponse.json({ error: 'Invalid user' }, { status: 401 });
     }
 
     const userId = typeof decoded.id === 'string' ? parseInt(decoded.id) : decoded.id;
+    console.log('[Activate-Test] User ID:', userId);
     
     // Get database connection
+    console.log('[Activate-Test] Getting database connection...');
     connection = await pool.getConnection();
+    console.log('[Activate-Test] Database connection established');
     
     // Start transaction
     await connection.beginTransaction();
+    console.log('[Activate-Test] Transaction started');
     
     try {
       // 1. Get payment details first
@@ -74,18 +88,19 @@ export async function POST(request: Request) {
       const payment = paymentRows[0];
       
       // 2. Generate membership number and get current year
-      const year = new Date().getFullYear().toString().slice(-2);
+      const cycleYear = getCycleYearForDate(new Date()); // Use membership cycle year (2025 until Feb 1, 2026)
+      const year = cycleYear.toString().slice(-2);
       const membershipNumber = `TLA${year}${Math.floor(10000 + Math.random() * 90000)}`;
-      const currentYear = new Date().getFullYear();
       
       // Calculate expiry year based on membership cycle (Feb 1 - Jan 31)
       const now = new Date();
-      const expiryYear = now.getFullYear();
+      const expiryYear = cycleYear + 1; // Expires at end of next calendar year
       
       console.log(' Membership cycle calculation:', {
         today: now.toISOString(),
         currentMonth: now.getMonth(),
-        currentYear,
+        calendarYear: now.getFullYear(),
+        cycleYear,
         expiryYear,
         expiryDate: `${expiryYear}-01-31`
       });
@@ -106,12 +121,13 @@ export async function POST(request: Request) {
             payment.amount || 40000,
             payment.payment_method || 'test',
             payment.reference,
-            currentYear
+            cycleYear
           ]
         );
       } catch (error) {
         await connection.rollback();
-        throw new Error(`Failed to create/update membership_payments record: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
+        throw new Error(`Failed to create/update membership_payments record: ${errorMessage}`);
       }
       
       // 4. Then, update the payments table to match the membership_payments status
@@ -127,7 +143,8 @@ export async function POST(request: Request) {
         );
       } catch (error) {
         await connection.rollback();
-        throw new Error(`Failed to update payments table: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
+        throw new Error(`Failed to update payments table: ${errorMessage}`);
       }
       
       // 5. Finally, create or update the membership record
@@ -136,9 +153,9 @@ export async function POST(request: Request) {
           `INSERT INTO memberships 
            (user_id, membership_number, membership_type, status, 
             payment_status, payment_date, reference, payment_method,
-            expiry_date, amount_paid, created_at, updated_at)
+            expiry_date, amount_paid, cycle_year, created_at, updated_at)
            VALUES (?, ?, ?, 'active', 'paid', NOW(), ?, ?, 
-                  DATE(CONCAT(?, '-01-31')), ?, NOW(), NOW())
+                  DATE(CONCAT(?, '-01-31')), ?, ?, NOW(), NOW())
            ON DUPLICATE KEY UPDATE
              status = 'active',
              membership_type = VALUES(membership_type),
@@ -148,6 +165,7 @@ export async function POST(request: Request) {
              payment_method = VALUES(payment_method),
              expiry_date = VALUES(expiry_date),
              amount_paid = VALUES(amount_paid),
+             cycle_year = VALUES(cycle_year),
              updated_at = NOW()`,
           [
             userId, 
@@ -156,18 +174,20 @@ export async function POST(request: Request) {
             payment.reference,
             payment.payment_method || 'test',
             payment.amount || 40000,
-            expiryYear
+            expiryYear,
+            cycleYear
           ]
         );
       } catch (error) {
         await connection.rollback();
-        throw new Error(`Failed to create/update membership record: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
+        throw new Error(`Failed to create/update membership record: ${errorMessage}`);
       }
       
       // Commit the transaction
       await connection.commit();
       
-      console.log('✓ Test payment activated successfully:', {
+      console.log(' Test payment activated successfully:', {
         reference,
         userId,
         membershipNumber,
