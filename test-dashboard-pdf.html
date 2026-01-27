@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Dashboard PDF</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <h1>Test Dashboard PDF Generation</h1>
+    
+    <div id="test-card" style="width: 336px; height: 212px; position: relative; margin: 20px;">
+        <!-- Simple test card -->
+        <svg width="336" height="212" xmlns="http://www.w3.org/2000/svg" style="position: absolute; inset: 0; border-radius: 16px; overflow: hidden;">
+            <defs>
+                <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#2d3e50" />
+                    <stop offset="50%" stop-color="#34495e" />
+                    <stop offset="100%" stop-color="#1a252f" />
+                </linearGradient>
+            </defs>
+            
+            <!-- Main background -->
+            <rect width="336" height="212" fill="url(#bgGradient)" rx="16" ry="16"/>
+            
+            <!-- Top header bar -->
+            <rect width="336" height="50" fill="rgba(16, 185, 129, 0.2)" rx="16" ry="16"/>
+            
+            <!-- Logo Image -->
+            <image href="/logo (3).png" x="-20" y="-20" width="130" height="130" preserveAspectRatio="xMidYMid meet"/>
+            
+            <!-- Organization name -->
+            <text x="190" y="30" font-family="Arial" font-size="12" font-weight="900" fill="white" text-anchor="middle">TANZANIA LIBRARY AND</text>
+            <text x="190" y="50" font-family="Arial" font-size="12" font-weight="900" fill="white" text-anchor="middle">INFORMATION ASSOCIATION</text>
+            <text x="175" y="70" font-family="Arial" font-size="10" fill="#10b981" text-anchor="middle" font-weight="600">(TLA)</text>
+            
+            <!-- Profile picture area -->
+            <g>
+                <rect x="233" y="67" width="90" height="90" fill="none" rx="8" ry="8"/>
+                <image href="/uploads/profile-pictures/user_25.jpg" x="233" y="67" width="90" height="90" rx="8" ry="8" preserveAspectRatio="xMidYMid slice"/>
+            </g>
+            
+            <!-- Member name -->
+            <text x="20" y="95" font-family="Arial, sans-serif" font-size="8" fill="#10b981" font-weight="700" letter-spacing="1">MEMBER NAME</text>
+            <text x="20" y="115" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="white">Hassan Samatua</text>
+            
+            <!-- Membership number -->
+            <text x="20" y="130" font-family="Arial, sans-serif" font-size="8" fill="#10b981" font-weight="700" letter-spacing="0.5">MEMBERSHIP No</text>
+            <text x="20" y="150" font-family="monospace" font-size="14" font-weight="bold" fill="white" letter-spacing="2">TLA2670492</text>
+            
+            <!-- Membership type -->
+            <text x="20" y="170" font-family="Arial, sans-serif" font-size="7" fill="#10b981" font-weight="700">TYPE</text>
+            <text x="20" y="185" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="white">PROFESSIONAL</text>
+            
+            <!-- Phone number -->
+            <text x="165" y="170" font-family="Arial, sans-serif" font-size="7" fill="#10b981" font-weight="700" text-anchor="end">PHONE</text>
+            <text x="201" y="185" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="white" text-anchor="end">+255 712 345 678</text>
+            
+            <!-- Bottom accent bar -->
+            <rect y="192" width="336" height="20" fill="rgba(16, 185, 129, 0.15)"/>
+            <text x="16" y="205" font-family="Arial, sans-serif" font-size="8" fill="rgba(255, 255, 255, 0.7)">Authorized Membership Card • TLA</text>
+        </svg>
+    </div>
+    
+    <div style="margin: 20px;">
+        <button onclick="testDirectPDF()">Test Direct PDF Generation</button>
+        <div id="result"></div>
+    </div>
+    
+    <script>
+        async function testDirectPDF() {
+            const resultDiv = document.getElementById('result');
+            const cardElement = document.getElementById('test-card');
+            
+            resultDiv.innerHTML = '<h3>Testing Direct PDF Generation...</h3>';
+            
+            try {
+                console.log('🎨 Starting direct PDF generation test...');
+                
+                // Capture the actual displayed card element directly
+                const canvas = await html2canvas(cardElement, {
+                    scale: 4, // ULTRA high quality
+                    backgroundColor: null,
+                    logging: false,
+                    useCORS: true,
+                    allowTaint: true
+                });
+                
+                console.log('✅ Capture successful! Canvas size:', canvas.width, 'x', canvas.height);
+                
+                // Create PDF
+                const pdf = new jspdf.jsPDF({
+                    orientation: 'landscape',
+                    unit: 'px',
+                    format: [336, 212]
+                });
+                
+                pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, 336, 212);
+                
+                // Generate filename
+                const fileName = `TLA_Membership_Card_TEST_${new Date().toISOString().split('T')[0]}.pdf`;
+                pdf.save(fileName);
+                
+                resultDiv.innerHTML = `
+                    <p style="color: green;">✅ PDF generated successfully!</p>
+                    <p>Filename: ${fileName}</p>
+                    <p>Canvas size: ${canvas.width}x${canvas.height}</p>
+                `;
+                
+                console.log('✅ PDF generated successfully:', fileName);
+                
+            } catch (error) {
+                console.error('❌ Capture failed:', error);
+                resultDiv.innerHTML = `<p style="color: red;">❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Also test our direct method
+        async function testOurDirectMethod() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<h3>Testing Our Direct Method...</h3>';
+            
+            try {
+                // Simulate the card data
+                const cardData = {
+                    userName: 'Hassan Samatua',
+                    membershipNumber: 'TLA2670492',
+                    membershipType: 'Professional',
+                    profilePicture: '/uploads/profile-pictures/user_25.jpg',
+                    userPhone: '+255 712 345 678'
+                };
+                
+                console.log('📋 Card data:', cardData);
+                
+                // This would call our direct method
+                resultDiv.innerHTML += '<p>Our direct method would be called here with the above data.</p>';
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                resultDiv.innerHTML += `<p style="color: red;">❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Auto-test on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                console.log('🧪 Auto-testing direct PDF generation...');
+                testDirectPDF();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

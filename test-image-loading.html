@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Loading Test</title>
+</head>
+<body>
+    <h1>Image Loading Test</h1>
+    <div id="results"></div>
+    
+    <script>
+        async function testImageLoading() {
+            const results = document.getElementById('results');
+            const testUrls = [
+                '/uploads/profile-pictures/user_25.jpg',
+                '/public/uploads/profile-pictures/user_25.jpg',
+                'http://localhost:3000/uploads/profile-pictures/user_25.jpg',
+                'http://localhost:3000/public/uploads/profile-pictures/user_25.jpg',
+                '/logo (3).png',
+                'http://localhost:3000/logo (3).png'
+            ];
+            
+            results.innerHTML = '<h2>Testing Image URLs...</h2>';
+            
+            for (const url of testUrls) {
+                const div = document.createElement('div');
+                div.style.marginBottom = '20px';
+                div.style.border = '1px solid #ccc';
+                div.style.padding = '10px';
+                
+                const title = document.createElement('h3');
+                title.textContent = `Testing: ${url}`;
+                div.appendChild(title);
+                
+                // Test 1: Direct image
+                const img1 = document.createElement('img');
+                img1.style.maxWidth = '100px';
+                img1.style.maxHeight = '100px';
+                img1.style.border = '1px solid red';
+                img1.alt = 'Direct load';
+                
+                img1.onload = () => {
+                    const status = document.createElement('p');
+                    status.textContent = '✅ Direct load SUCCESS';
+                    status.style.color = 'green';
+                    div.appendChild(status);
+                };
+                
+                img1.onerror = () => {
+                    const status = document.createElement('p');
+                    status.textContent = '❌ Direct load FAILED';
+                    status.style.color = 'red';
+                    div.appendChild(status);
+                };
+                
+                img1.src = url;
+                div.appendChild(img1);
+                
+                // Test 2: Fetch method
+                fetch(url)
+                    .then(response => {
+                        const status = document.createElement('p');
+                        if (response.ok) {
+                            status.textContent = `✅ Fetch SUCCESS (${response.status})`;
+                            status.style.color = 'green';
+                        } else {
+                            status.textContent = `❌ Fetch FAILED (${response.status})`;
+                            status.style.color = 'red';
+                        }
+                        div.appendChild(status);
+                    })
+                    .catch(error => {
+                        const status = document.createElement('p');
+                        status.textContent = `❌ Fetch ERROR: ${error.message}`;
+                        status.style.color = 'red';
+                        div.appendChild(status);
+                    });
+                
+                results.appendChild(div);
+            }
+        }
+        
+        // Run test when page loads
+        testImageLoading();
+    </script>
+</body>
+</html>

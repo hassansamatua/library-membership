@@ -1,0 +1,81 @@
+/* Print styles for membership card */
+@media print {
+  /* Hide everything except the membership card */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Show only the membership card and its direct children */
+  #membership-card-element,
+  #membership-card-element * {
+    visibility: visible;
+  }
+  
+  /* Position the card properly for printing */
+  #membership-card-element {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 336px !important;
+    height: 212px !important;
+    page-break-inside: avoid;
+    page-break-after: always;
+  }
+  
+  /* Ensure proper sizing for print */
+  #membership-card-element svg {
+    width: 336px !important;
+    height: 212px !important;
+  }
+  
+  /* Hide action buttons during print */
+  .membership-card button {
+    display: none !important;
+  }
+  
+  /* Print setup for credit card size */
+  @page {
+    size: 85.6mm 53.98mm; /* Credit card dimensions */
+    margin: 0;
+    orientation: landscape;
+  }
+  
+  /* Alternative: A4 page with centered card */
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+  
+  /* Center the card on the page */
+  @media print {
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+    }
+    
+    #membership-card-element {
+      position: relative !important;
+      transform: scale(1); /* Adjust scale as needed */
+    }
+  }
+}
+
+/* High-quality print settings */
+@media print {
+  #membership-card-element {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Ensure gradients and colors print correctly */
+  #membership-card-element svg * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

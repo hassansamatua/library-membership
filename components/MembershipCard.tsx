@@ -1,6 +1,13 @@
 "use client";
 
-import { FiUser } from 'react-icons/fi';
+import { FiUser, FiDownload, FiPrinter } from 'react-icons/fi';
+import { useState } from 'react';
+import { generateMembershipCardPDF, printMembershipCard, MembershipCardData } from '@/lib/membershipCardPDF';
+import { generateMembershipCardPDFNative, generateMembershipCardPDFFallback } from '@/lib/membershipCardPDFAlternative';
+import { generateMembershipCardPDFPerfect, printMembershipCardPerfect } from '@/lib/membershipCardPDFPerfect';
+import { generateMembershipCardPDFExact, generateMembershipCardPDFDirect, printMembershipCardExact, printMembershipCardDirect } from '@/lib/membershipCardPDFExact';
+import { generateMembershipCardPDFFromTemplate, printMembershipCardFromTemplate } from '@/lib/membershipCardTemplate';
+import { generateMembershipCardPDFDirect as generateDirectPDF, printMembershipCardDirect as printDirectPDF } from '@/lib/membershipCardDirect';
 
 interface MembershipCardProps {
   userName: string;
@@ -9,6 +16,7 @@ interface MembershipCardProps {
   profilePicture?: string | null;
   userPhone?: string;
   className?: string;
+  showActions?: boolean; // New prop to show/hide action buttons
 }
 
 export default function MembershipCard({ 
@@ -17,11 +25,160 @@ export default function MembershipCard({
   membershipType, 
   profilePicture,
   userPhone,
-  className = "" 
+  className = "",
+  showActions = true 
 }: MembershipCardProps) {
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const cardData: MembershipCardData = {
+    userName,
+    membershipNumber,
+    membershipType,
+    profilePicture,
+    userPhone
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      setIsGenerating(true);
+      
+      // Try the DIRECT capture method first (captures actual displayed element)
+      try {
+        await generateDirectPDF(cardData);
+        return;
+      } catch (directError) {
+        console.warn('Direct capture method failed, trying template method:', directError);
+      }
+      
+      // Try the template-based method (base image + data overlay)
+      try {
+        await generateMembershipCardPDFFromTemplate(cardData);
+        return;
+      } catch (templateError) {
+        console.warn('Template method failed, trying exact clone:', templateError);
+      }
+      
+      // Try the exact clone method (literally copies the displayed card)
+      try {
+        await generateMembershipCardPDFExact(cardData);
+        return;
+      } catch (exactError) {
+        console.warn('Exact clone method failed, trying direct capture:', exactError);
+      }
+      
+      // Try the direct capture method (captures the actual displayed element)
+      try {
+        await generateMembershipCardPDFDirect(cardData);
+        return;
+      } catch (directError) {
+        console.warn('Direct capture method failed, trying perfect method:', directError);
+      }
+      
+      // Try the perfect method (recreates exact SVG)
+      try {
+        await generateMembershipCardPDFPerfect(cardData);
+        return;
+      } catch (perfectError) {
+        console.warn('Perfect method failed, trying original SVG:', perfectError);
+      }
+      
+      // Try the original SVG method
+      try {
+        await generateMembershipCardPDF(cardData);
+        return;
+      } catch (svgError) {
+        console.warn('SVG method failed, trying fallback:', svgError);
+      }
+      
+      // Try the HTML fallback method
+      try {
+        await generateMembershipCardPDFFallback(cardData);
+        return;
+      } catch (fallbackError) {
+        console.warn('Fallback method failed, trying native PDF:', fallbackError);
+      }
+      
+      // Finally try the native PDF method
+      try {
+        await generateMembershipCardPDFNative(cardData);
+        return;
+      } catch (nativeError) {
+        console.error('All PDF generation methods failed:', nativeError);
+        throw new Error('Unable to generate PDF. Please try again or contact support.');
+      }
+      
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    try {
+      setIsGenerating(true);
+      
+      // Try the direct print method first
+      try {
+        await printDirectPDF(cardData);
+        return;
+      } catch (directError) {
+        console.warn('Direct print method failed, trying template print:', directError);
+      }
+      
+      // Try the template print method first
+      try {
+        await printMembershipCardFromTemplate(cardData);
+        return;
+      } catch (templateError) {
+        console.warn('Template print method failed, trying exact print:', templateError);
+      }
+      
+      // Try the exact print method
+      try {
+        await printMembershipCardExact(cardData);
+        return;
+      } catch (exactError) {
+        console.warn('Exact print method failed, trying direct print:', exactError);
+      }
+      
+      // Try the direct print method
+      try {
+        await printMembershipCardDirect(cardData);
+        return;
+      } catch (directError) {
+        console.warn('Direct print method failed, trying perfect print:', directError);
+      }
+      
+      // Try the perfect print method
+      try {
+        await printMembershipCardPerfect(cardData);
+        return;
+      } catch (perfectError) {
+        console.warn('Perfect print method failed, trying original:', perfectError);
+      }
+      
+      // Try the original print method
+      try {
+        await printMembershipCard(cardData);
+        return;
+      } catch (printError) {
+        console.error('All print methods failed:', printError);
+        throw new Error('Unable to print card. Please try again or contact support.');
+      }
+      
+    } catch (error) {
+      console.error('Error printing card:', error);
+      alert('Failed to print card. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
-    <div className={`membership-card ${className} w-[336px] h-[212px]`} id="membership-card-element">
-      <div className="relative w-[336px] h-[212px]">
+    <div className={`membership-card ${className}`}>
+      <div className="relative w-[336px] h-[212px]" id="membership-card-element">
         {/* Card Design - SVG-based to match print version exactly */}
       <svg width="336" height="212" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 rounded-lg shadow-xl overflow-hidden">
         {/* Background with gradient */}
@@ -144,6 +301,29 @@ export default function MembershipCard({
         <text x="16" y="205" fontFamily="Arial, sans-serif" fontSize="8" fill="rgba(255, 255, 255, 0.7)">Authorized Membership Card • TLA</text>
       </svg>
     </div>
+
+    {/* Action Buttons */}
+    {showActions && (
+      <div className="mt-4 flex gap-3 justify-center">
+        <button
+          onClick={handleDownloadPDF}
+          disabled={isGenerating}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <FiDownload className="w-4 h-4" />
+          {isGenerating ? 'Generating...' : 'Download PDF'}
+        </button>
+        
+        <button
+          onClick={handlePrint}
+          disabled={isGenerating}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <FiPrinter className="w-4 h-4" />
+          {isGenerating ? 'Preparing...' : 'Print Card'}
+        </button>
+      </div>
+    )}
   </div>
   );
 }
